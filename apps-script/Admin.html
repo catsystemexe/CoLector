@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>CoLector — Editor formuláře</title>
+    <style>
+      :root {
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f5f7fb; }
+      main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+      .brand { font-size: 14px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 16px; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 20px; align-items: start; }
+      .panel { background: #fff; border-radius: 20px; padding: 22px; box-shadow: 0 8px 28px rgba(17,24,39,.08); }
+      h1, h2, h3 { margin-top: 0; }
+      h1 { font-size: 30px; margin-bottom: 6px; }
+      h2 { font-size: 20px; margin-bottom: 16px; }
+      .muted { color: #657086; line-height: 1.5; }
+      .field { margin-bottom: 16px; }
+      label { display: block; font-weight: 700; margin-bottom: 7px; }
+      input[type="text"], textarea, select {
+        width: 100%; border: 1px solid #cfd6e4; border-radius: 12px; padding: 12px 13px; font: inherit; background: #fff;
+      }
+      textarea { min-height: 90px; resize: vertical; }
+      input:focus, textarea:focus, select:focus { outline: 3px solid rgba(31,122,99,.14); border-color: #1f7a63; }
+      .fields { display: grid; gap: 12px; }
+      .field-card { border: 1px solid #dde2ec; border-radius: 14px; padding: 14px; }
+      .field-card-top { display: grid; grid-template-columns: 1fr 170px; gap: 10px; }
+      .field-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      button { border: 0; border-radius: 11px; padding: 10px 13px; font: inherit; font-weight: 750; cursor: pointer; }
+      .primary { background: #1f7a63; color: #fff; }
+      .secondary { background: #edf1f7; color: #243044; }
+      .danger { background: #fdecec; color: #8a2430; }
+      .toolbar { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin: 18px 0 10px; }
+      .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+      .preview-card { border: 1px solid #dde2ec; border-radius: 16px; padding: 18px; background: #fff; }
+      .preview-title { font-size: 25px; margin: 0 0 7px; }
+      .preview-instructions { margin: 0 0 18px; color: #657086; line-height: 1.5; }
+      .preview-field { margin-bottom: 16px; }
+      .preview-field label { margin-bottom: 7px; }
+      .fake-input { min-height: 44px; border: 1px solid #cfd6e4; border-radius: 11px; background: #fafbfc; }
+      .fake-input.tall { min-height: 100px; }
+      .json { margin-top: 16px; padding: 14px; background: #111827; color: #e5e7eb; border-radius: 12px; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      .status { margin-top: 12px; font-size: 14px; color: #135c49; min-height: 20px; }
+      @media (max-width: 860px) {
+        .layout { grid-template-columns: 1fr; }
+        .field-card-top { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">CoLector</div>
+      <div class="layout">
+        <section class="panel">
+          <h1>Editor formuláře</h1>
+          <p class="muted">M3.1 — editor vytváří kanonické <code>form_schema</code>. Uložení do Sheets přijde v dalším kroku.</p>
+
+          <div class="field">
+            <label for="formTitle">Název formuláře</label>
+            <input id="formTitle" type="text" value="Nový formulář">
+          </div>
+
+          <div class="field">
+            <label for="formInstructions">Instrukce</label>
+            <textarea id="formInstructions">Vyplňte prosím společnou odpověď týmu.</textarea>
+          </div>
+
+          <div class="toolbar">
+            <h2>Pole formuláře</h2>
+            <button id="addField" class="primary" type="button">+ Přidat pole</button>
+          </div>
+
+          <div id="fields" class="fields"></div>
+
+          <div class="toolbar">
+            <button id="validateSchema" class="secondary" type="button">Zkontrolovat schema</button>
+            <button id="saveDraft" class="primary" type="button">Uložit návrh</button>
+          </div>
+          <div id="status" class="status"></div>
+        </section>
+
+        <aside class="panel">
+          <h2>Náhled účastníka</h2>
+          <div id="preview" class="preview-card"></div>
+          <h3 style="margin-top:20px">form_schema</h3>
+          <div id="json" class="json"></div>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      const state = {
+        title: 'Nový formulář',
+        instructions: 'Vyplňte prosím společnou odpověď týmu.',
+        fields: [
+          { id: 'field_1', type: 'textarea', label: 'Položka 1', required: false }
+        ]
+      };
+
+      const fieldTypes = [
+        ['text', 'Krátký text'],
+        ['textarea', 'Dlouhý text'],
+        ['checkbox', 'Checkbox'],
+        ['select', 'Výběr z možností']
+      ];
+
+      const fieldsEl = document.getElementById('fields');
+      const previewEl = document.getElementById('preview');
+      const jsonEl = document.getElementById('json');
+      const statusEl = document.getElementById('status');
+      const titleEl = document.getElementById('formTitle');
+      const instructionsEl = document.getElementById('formInstructions');
+
+      function slugId(index) {
+        return 'field_' + (index + 1);
+      }
+
+      function normalizeIds() {
+        state.fields.forEach((field, index) => field.id = slugId(index));
+      }
+
+      function renderEditor() {
+        fieldsEl.innerHTML = '';
+
+        state.fields.forEach((field, index) => {
+          const card = document.createElement('div');
+          card.className = 'field-card';
+
+          const top = document.createElement('div');
+          top.className = 'field-card-top';
+
+          const labelWrap = document.createElement('div');
+          const label = document.createElement('label');
+          label.textContent = 'Název pole';
+          const labelInput = document.createElement('input');
+          labelInput.type = 'text';
+          labelInput.value = field.label;
+          labelInput.addEventListener('input', () => {
+            field.label = labelInput.value;
+            renderPreview();
+          });
+          labelWrap.append(label, labelInput);
+
+          const typeWrap = document.createElement('div');
+          const typeLabel = document.createElement('label');
+          typeLabel.textContent = 'Typ';
+          const select = document.createElement('select');
+          fieldTypes.forEach(([value, text]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            option.selected = field.type === value;
+            select.appendChild(option);
+          });
+          select.addEventListener('change', () => {
+            field.type = select.value;
+            renderPreview();
+          });
+          typeWrap.append(typeLabel, select);
+          top.append(labelWrap, typeWrap);
+
+          const requiredWrap = document.createElement('label');
+          requiredWrap.className = 'checkbox-row';
+          const required = document.createElement('input');
+          required.type = 'checkbox';
+          required.checked = !!field.required;
+          required.addEventListener('change', () => {
+            field.required = required.checked;
+            renderPreview();
+          });
+          requiredWrap.append(required, document.createTextNode('Povinné pole'));
+
+          const actions = document.createElement('div');
+          actions.className = 'field-actions';
+
+          const up = actionButton('↑ Nahoru', 'secondary', () => moveField(index, -1));
+          const down = actionButton('↓ Dolů', 'secondary', () => moveField(index, 1));
+          const del = actionButton('Smazat', 'danger', () => {
+            state.fields.splice(index, 1);
+            normalizeIds();
+            renderAll();
+          });
+
+          up.disabled = index === 0;
+          down.disabled = index === state.fields.length - 1;
+          actions.append(up, down, del);
+          card.append(top, requiredWrap, actions);
+          fieldsEl.appendChild(card);
+        });
+      }
+
+      function actionButton(text, className, handler) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        button.textContent = text;
+        button.addEventListener('click', handler);
+        return button;
+      }
+
+      function moveField(index, delta) {
+        const target = index + delta;
+        if (target < 0 || target >= state.fields.length) return;
+        const [item] = state.fields.splice(index, 1);
+        state.fields.splice(target, 0, item);
+        normalizeIds();
+        renderAll();
+      }
+
+      function renderPreview() {
+        state.title = titleEl.value.trim();
+        state.instructions = instructionsEl.value.trim();
+
+        previewEl.innerHTML = '';
+        const h = document.createElement('h3');
+        h.className = 'preview-title';
+        h.textContent = state.title || 'Bez názvu';
+        const p = document.createElement('p');
+        p.className = 'preview-instructions';
+        p.textContent = state.instructions;
+        previewEl.append(h, p);
+
+        state.fields.forEach(field => {
+          const wrap = document.createElement('div');
+          wrap.className = 'preview-field';
+          const label = document.createElement('label');
+          label.textContent = field.label || 'Bez názvu' + (field.required ? ' *' : '');
+          if (field.required) label.textContent += ' *';
+          wrap.appendChild(label);
+
+          if (field.type === 'checkbox') {
+            const row = document.createElement('div');
+            row.className = 'checkbox-row';
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.disabled = true;
+            row.append(box, document.createTextNode('Ano'));
+            wrap.appendChild(row);
+          } else if (field.type === 'select') {
+            const fake = document.createElement('select');
+            fake.disabled = true;
+            const option = document.createElement('option');
+            option.textContent = 'Možnost';
+            fake.appendChild(option);
+            wrap.appendChild(fake);
+          } else {
+            const fake = document.createElement('div');
+            fake.className = 'fake-input' + (field.type === 'textarea' ? ' tall' : '');
+            wrap.appendChild(fake);
+          }
+
+          previewEl.appendChild(wrap);
+        });
+
+        jsonEl.textContent = JSON.stringify(buildSchema(), null, 2);
+      }
+
+      function buildSchema() {
+        return {
+          version: 1,
+          title: state.title,
+          instructions: state.instructions,
+          fields: state.fields.map(field => ({
+            id: field.id,
+            type: field.type,
+            label: field.label,
+            required: !!field.required
+          }))
+        };
+      }
+
+      function validateSchema() {
+        const schema = buildSchema();
+        if (!schema.title) return 'Chybí název formuláře.';
+        if (!schema.fields.length) return 'Formulář musí mít alespoň jedno pole.';
+        const badField = schema.fields.find(field => !field.label.trim());
+        if (badField) return 'Každé pole musí mít název.';
+        return '';
+      }
+
+      function renderAll() {
+        renderEditor();
+        renderPreview();
+      }
+
+      document.getElementById('addField').addEventListener('click', () => {
+        state.fields.push({ id: slugId(state.fields.length), type: 'textarea', label: 'Nové pole', required: false });
+        normalizeIds();
+        renderAll();
+      });
+
+      titleEl.addEventListener('input', renderPreview);
+      instructionsEl.addEventListener('input', renderPreview);
+
+      document.getElementById('validateSchema').addEventListener('click', () => {
+        const error = validateSchema();
+        statusEl.textContent = error || 'Schema je validní.';
+      });
+
+      document.getElementById('saveDraft').addEventListener('click', () => {
+        const error = validateSchema();
+        statusEl.textContent = error || 'Návrh je připraven. Persistence přijde v M3.2.';
+      });
+
+      renderAll();
+    </script>
+  </body>
+</html>
