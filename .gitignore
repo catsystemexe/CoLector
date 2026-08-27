@@ -17,6 +17,7 @@ yarn-error.log*
 
 # clasp local auth/config artifacts that must not leak secrets
 .clasprc.json
+apps-script/.clasp.json
 
 # Temporary files
 *.tmp
