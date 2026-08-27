@@ -2,6 +2,16 @@ const SPREADSHEET_ID = '1YWlpsu_LbDOVtf4dE6f0iqzJYyasfhJ4-gCWZVib0sk';
 const RESPONSES_SHEET = 'RESPONSES';
 
 function doGet(e) {
+  const view = (e && e.parameter && e.parameter.view) || '';
+
+  if (view === 'editor') {
+    return HtmlService.createTemplateFromFile('Admin')
+      .evaluate()
+      .setTitle('CoLector — Editor formuláře')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
   const cardId = (e && e.parameter && e.parameter.card) || 'kompetence';
   const cards = getPrototypeCards_();
   const card = cards[cardId] || cards.kompetence;
