@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CoLector — Data a výsledky</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182238;background:#f4f6fb;--line:#e4e8f0;--muted:#748096}*{box-sizing:border-box}body{margin:0;background:#f4f6fb}.app-header{position:sticky;top:0;z-index:20;min-height:62px;display:flex;align-items:center;gap:10px;padding:9px 14px;background:rgba(255,255,255,.97);border-bottom:1px solid #e6e9f0;box-shadow:0 2px 12px rgba(28,38,64,.05)}button{font:inherit;cursor:pointer}.back{width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:#5f6b82;font-size:24px}.back:hover{background:#f2f4f9}.brand-mark{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#506fea,#7658d8);color:#fff;font-weight:900}.brand{font-weight:850;font-size:18px}.section-name{color:#6d778b;font-size:14px;margin-left:3px}main{width:min(100%,620px);margin:0 auto;padding:22px 14px 60px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 24px rgba(26,37,62,.055);padding:24px 18px}.icon{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:#f0f3ff;color:#526be1;margin-bottom:14px}.icon svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.8}h1{font-size:22px;margin:0 0 7px;color:#27334a}p{margin:0;color:var(--muted);line-height:1.5}@media(min-width:760px){.app-header{min-height:68px;padding:10px 20px}.brand{font-size:19px}main{padding-top:38px}}
+  </style>
+</head>
+<body>
+  <header class="app-header"><button id="back" class="back" type="button" aria-label="Zpět">‹</button><div class="brand-mark">C</div><div><span class="brand">CoLector</span><span class="section-name"> / Data a výsledky</span></div></header>
+  <main><section class="card"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div><h1>Data a výsledky</h1><p>Přehled odpovědí a výstupů bude doplněn v další fázi.</p></section></main>
+  <script>const APP_URL=<?!= JSON.stringify(appUrl) ?>;document.getElementById('back').onclick=()=>{window.top.location.href=APP_URL+'?view=home'};</script>
+</body>
+</html>
