@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CoLector — Home</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182238;background:#f4f6fb;--accent:#3f61e8;--line:#e4e8f0;--muted:#748096;--header-height:62px}*{box-sizing:border-box}html,body{min-height:100%}body{margin:0;background:#f4f6fb}button{font:inherit;cursor:pointer}.app-header{position:sticky;top:0;z-index:20;min-height:var(--header-height);display:flex;align-items:center;padding:9px 14px;background:rgba(255,255,255,.97);border-bottom:1px solid #e6e9f0;box-shadow:0 2px 12px rgba(28,38,64,.05)}.brand-wrap{display:flex;align-items:center;gap:10px;white-space:nowrap;cursor:pointer;border-radius:11px}.brand-wrap:focus-visible{outline:3px solid rgba(63,97,232,.18);outline-offset:3px}.brand-mark{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#506fea,#7658d8);color:#fff;font-weight:900}.brand{font-weight:850;font-size:18px}.section-name{color:#6d778b;font-size:14px;margin-left:3px}main{width:min(100%,620px);margin:0 auto;padding:22px 14px 60px}.new-form{width:100%;min-height:62px;border:0;border-radius:16px;background:linear-gradient(135deg,#506fea,#7159d8);color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 9px 24px rgba(63,97,232,.24)}.new-form:active{transform:translateY(1px)}.stack{display:grid;gap:18px;margin-top:22px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 24px rgba(26,37,62,.055);overflow:hidden}.section-button{width:100%;min-height:64px;border:0;background:#fff;display:flex;align-items:center;gap:12px;padding:14px 16px;text-align:left;color:#27334a}.section-button:hover,.form-row:hover{background:#fafbfe}.section-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#f0f3ff;color:#526be1;flex:0 0 auto}.section-icon svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}.section-title{font-weight:800;font-size:17px;flex:1}.chevron{color:#98a2b4;font-size:24px;line-height:1}.forms-list{border-top:1px solid #edf0f5}.form-row{width:100%;min-height:70px;border:0;border-bottom:1px solid #edf0f5;background:#fff;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 16px;text-align:left;color:#27334a}.form-row:last-child{border-bottom:0}.form-title{font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.form-date{margin-top:4px;color:var(--muted);font-size:13px}.empty{padding:18px 16px 20px;color:var(--muted);font-size:14px;border-top:1px solid #edf0f5}.data-card{width:100%;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 8px 24px rgba(26,37,62,.055);display:flex;align-items:center;gap:12px;padding:16px;text-align:left;color:#27334a}.data-card:hover{background:#fafbfe}.data-copy{min-width:0;flex:1}.data-title{font-weight:800;font-size:17px}.data-subtitle{margin-top:4px;color:var(--muted);font-size:13px}.loading{padding:18px 16px;color:var(--muted);font-size:14px;border-top:1px solid #edf0f5}@media(min-width:760px){:root{--header-height:68px}.app-header{padding:10px 20px}.brand{font-size:19px}main{padding-top:38px}.new-form{min-height:66px}.stack{margin-top:26px}}
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div id="homeBrand" class="brand-wrap" role="link" tabindex="0" aria-label="Přejít na Home"><div class="brand-mark">C</div><div><span class="brand">CoLector</span><span class="section-name"> / Home</span></div></div>
+  </header>
+
+  <main>
+    <button id="newForm" class="new-form" type="button"><span aria-hidden="true">＋</span><span>Nový formulář</span></button>
+
+    <div class="stack">
+      <section class="card" aria-labelledby="formsHeading">
+        <button id="allForms" class="section-button" type="button">
+          <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 11h6M9 15h6"/></svg></span>
+          <span id="formsHeading" class="section-title">Moje formuláře</span><span class="chevron">›</span>
+        </button>
+        <div id="recentForms" class="forms-list"><div class="loading">Načítám formuláře…</div></div>
+      </section>
+
+      <button id="dataResults" class="data-card" type="button">
+        <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+        <span class="data-copy"><span class="data-title">Data a výsledky</span><span class="data-subtitle">Přehled odpovědí a výstupů</span></span><span class="chevron">›</span>
+      </button>
+    </div>
+  </main>
+
+  <script>
+    const APP_URL=<?!= JSON.stringify(appUrl) ?>;
+    const recentFormsEl=document.getElementById('recentForms');
+    function go(query){window.top.location.href=APP_URL+query}
+    function formatDate(value){if(!value)return'';const d=new Date(value);if(Number.isNaN(d.getTime()))return'';return new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}).format(d)}
+    function renderRecent(forms){recentFormsEl.innerHTML='';const recent=(forms||[]).slice(0,3);if(!recent.length){recentFormsEl.innerHTML='<div class="empty">Zatím nemáš žádný uložený formulář.</div>';return}recent.forEach(form=>{const row=document.createElement('button');row.className='form-row';row.type='button';const copy=document.createElement('span');const title=document.createElement('div');title.className='form-title';title.textContent=form.internalTitle||form.title||'Bez názvu';const date=document.createElement('div');date.className='form-date';date.textContent=formatDate(form.updatedAt||form.createdAt);copy.append(title,date);const chevron=document.createElement('span');chevron.className='chevron';chevron.textContent='›';row.append(copy,chevron);row.onclick=()=>go('?view=editor&form='+encodeURIComponent(form.formId));recentFormsEl.append(row)})}
+    function renderError(){recentFormsEl.innerHTML='<div class="empty">Formuláře se nepodařilo načíst.</div>'}
+    const homeBrand=document.getElementById('homeBrand');
+    homeBrand.onclick=()=>go('?view=home');
+    homeBrand.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go('?view=home')}};
+    document.getElementById('newForm').onclick=()=>go('?view=editor&new=1');
+    document.getElementById('allForms').onclick=()=>go('?view=forms');
+    document.getElementById('dataResults').onclick=()=>go('?view=data');
+    google.script.run.withSuccessHandler(renderRecent).withFailureHandler(renderError).listFormDrafts();
+  </script>
+</body>
+</html>

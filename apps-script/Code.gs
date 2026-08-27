@@ -12,17 +12,26 @@ const FORMS_HEADERS = [
 ];
 
 function doGet(e) {
-  const view = (e && e.parameter && e.parameter.view) || '';
+  const params = (e && e.parameter) || {};
+  const view = params.view || '';
 
   if (view === 'editor') {
-    return HtmlService.createTemplateFromFile('Admin')
-      .evaluate()
-      .setTitle('CoLector — Editor formuláře')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    return renderEditor_();
   }
 
-  const cardId = (e && e.parameter && e.parameter.card) || 'kompetence';
+  if (view === 'forms') {
+    return renderTemplatePage_('Forms', 'CoLector — Moje formuláře');
+  }
+
+  if (view === 'data') {
+    return renderTemplatePage_('Data', 'CoLector — Data a výsledky');
+  }
+
+  if (view === 'home' || (!view && !params.card)) {
+    return renderTemplatePage_('Home', 'CoLector — Home');
+  }
+
+  const cardId = params.card || 'kompetence';
   const cards = getPrototypeCards_();
   const card = cards[cardId] || cards.kompetence;
 
@@ -34,6 +43,117 @@ function doGet(e) {
     .setTitle('CoLector')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function renderTemplatePage_(fileName, title) {
+  const template = HtmlService.createTemplateFromFile(fileName);
+  template.appUrl = ScriptApp.getService().getUrl();
+
+  return template
+    .evaluate()
+    .setTitle(title)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function renderEditor_() {
+  const baseHtml = HtmlService.createHtmlOutputFromFile('Admin').getContent();
+  const html = baseHtml.replace('</body>', getEditorRouteBootstrap_() + '\n</body>');
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('CoLector — Editor formuláře')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function getEditorRouteBootstrap_() {
+  const appUrl = ScriptApp.getService().getUrl();
+  return `<script>
+(function(){
+  clearTimeout(saveTimer);
+  saveTimer=null;
+
+  const homeBrand=document.querySelector('.brand-wrap');
+  if(homeBrand){
+    homeBrand.style.cursor='pointer';
+    homeBrand.setAttribute('role','link');
+    homeBrand.setAttribute('tabindex','0');
+    homeBrand.setAttribute('aria-label','Přejít na Home');
+    const goHome=function(){window.top.location.href=${JSON.stringify(appUrl)}+'?view=home'};
+    homeBrand.addEventListener('click',goHome);
+    homeBrand.addEventListener('keydown',function(event){
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();goHome()}
+    });
+  }
+
+  function applyEditorSchema(schema){
+    clearTimeout(saveTimer);
+    Object.keys(state).forEach(function(key){delete state[key]});
+    Object.assign(state,schema||{});
+    state.version=state.version||2;
+    if(!state.formId)state.formId=createId('form');
+    state.internalTitle=state.internalTitle||'Nový formulář';
+    state.title=state.title||'';
+    state.instructions=state.instructions||'';
+    state.fields=Array.isArray(state.fields)?state.fields:[];
+    normalizeLoadedState();
+    internalTitleEl.value=state.internalTitle;
+    titleEl.value=state.title;
+    instructionsEl.value=state.instructions;
+    autoSizeInstructions();
+    renderEditor();
+    renderPreview();
+    scheduleSave();
+  }
+
+  function createBlankSchema(){
+    return {
+      version:2,
+      formId:createId('form'),
+      internalTitle:'Nový formulář',
+      title:'',
+      instructions:'',
+      fields:[{
+        id:createId('field'),
+        type:'textarea',
+        label:'',
+        required:false,
+        height:115,
+        accent:'blue'
+      }]
+    };
+  }
+
+  google.script.url.getLocation(function(location){
+    const params=(location&&location.parameter)||{};
+
+    if(params.new==='1'){
+      applyEditorSchema(createBlankSchema());
+      return;
+    }
+
+    if(params.form){
+      setSaveStatus('Načítám…','saving','Načítám formulář');
+      google.script.run
+        .withSuccessHandler(function(result){
+          if(!result||!result.schema){
+            setSaveStatus('Nenalezeno','error','Formulář nebyl nalezen');
+            return;
+          }
+          applyEditorSchema(result.schema);
+        })
+        .withFailureHandler(function(error){
+          const message=error&&error.message?error.message:'Formulář se nepodařilo načíst';
+          setSaveStatus('Chyba','error',message);
+        })
+        .getFormDraft(params.form);
+      return;
+    }
+
+    scheduleSave();
+  });
+})();
+</script>`;
 }
 
 function saveFormDraft(payload) {
