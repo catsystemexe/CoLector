@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 256" role="img" aria-label="CoLector logo">
+  <defs>
+    <linearGradient id="g" x1="20%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#12B8B5"/>
+      <stop offset="52%" stop-color="#069EAE"/>
+      <stop offset="100%" stop-color="#087CA8"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="url(#g)"/>
+  <path d="M128 69 L180 99 Q186 103 180 107 L128 137 L76 107 Q70 103 76 99 Z" fill="#FFFFFF"/>
+  <path d="M78 126 L128 155 L178 126 L178 140 L128 169 L78 140 Z" fill="#FFFFFF"/>
+  <path d="M78 151 L128 180 L178 151 L178 165 L128 194 L78 165 Z" fill="#FFFFFF"/>
+  <text x="286" y="151" font-family="Inter, Arial, Helvetica, sans-serif" font-size="88" font-weight="700" fill="#1F2937" letter-spacing="-2">CoLector</text>
+</svg>
