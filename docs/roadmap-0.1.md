@@ -1,243 +1,400 @@
 # CoLector 0.1 — Roadmap implementace prototypu
 
-## Princip
+## 1. Princip
 
-Cílem není stavět plnohodnotnou aplikaci. Cílem je ověřit jediný pracovní tok:
+CoLector má převést pracovní kartičku z papíru do jednoduchého digitálního toku:
 
-`QR → mobilní formulář → odpověď → Google Sheets`
+`editor formuláře → vlastní Google Sheet → QR distribuce → tým vyplní → data se zapíší → lektor je vidí → export / další zpracování`
 
-Vše ostatní je sekundární.
+M1 a M2 již ověřily základní technický vertical slice:
 
-## Technický baseline
+`QR → mobilní formulář → submit → Google Apps Script → Google Sheets`
+
+Další vývoj proto pokračuje od editoru formulářů a cílového datového modelu.
+
+## 2. Technický baseline
 
 - Frontend: HTML + CSS + vanilla JavaScript
 - Backend/runtime: Google Apps Script
 - Datová vrstva: Google Sheets
 - Hosting: Google Apps Script Web App
-- Vývoj: Replit Free
 - Source of truth: GitHub
-- AI uvnitř aplikace: ne
-- Placené služby: ne
+- Pracovní prostředí: Replit Free
+- Deploy: `GitHub → Replit → npx @google/clasp → Apps Script → Web App deployment`
+- Účty účastníků: ne
+- Vlastní databáze: ne
+- Placená infrastruktura: ne
 
-## M0 — Scope + datový kontrakt
+## 3. Kanonický datový model
 
-Výstup:
+### Formulář
 
-- uzavřený scope 0.1,
-- schéma `CARDS`,
-- schéma `RESPONSES`,
-- formát `schema_json`,
-- formát `data_json`,
-- pravidla `response_id` a idempotence.
+Každý formulář má stabilní `form_id` a kanonické `form_schema`.
 
-Exit criteria:
-
-- datový kontrakt je dostatečně přesný pro implementaci bez dalších produktových rozhodnutí.
-
-## M1 — QR → mobilní kartička
-
-Nejprve pouze read-only render jedné ručně vložené testovací kartičky.
-
-Výstup:
-
-- testovací záznam v `CARDS`,
-- veřejná URL kartičky,
-- QR s touto URL,
-- mobile-first formulář vygenerovaný ze `schema_json`.
-
-Exit criteria:
-
-- QR lze načíst běžným Android/iPhone telefonem,
-- formulář je čitelný a použitelný bez vysvětlování.
-
-## M2 — Online submission → Sheets
-
-Výstup:
-
-- odeslání formuláře,
-- serverová validace `card_id`,
-- generování / kontrola `response_id`,
-- serverový timestamp,
-- `source=online`,
-- zápis do `RESPONSES`.
-
-Exit criteria:
-
-- série testovacích odeslání neztrácí ani nepřepisuje odpovědi,
-- duplicitní submit nevytváří nekontrolované duplicity.
-
-## M3 — Minimální přehled odpovědí
-
-Výstup:
-
-- počet odpovědí na kartičku,
-- seznam přijatých odpovědí,
-- jednoduchý refresh / polling,
-- detail odpovědi.
-
-Exit criteria:
-
-- lektor během simulace vidí, kolik odpovědí dorazilo a jejich obsah.
-
-## M4 — Editor kartiček
-
-Podporované bloky 0.1:
-
-- instrukční text,
-- krátké textové pole,
-- dlouhé textové pole,
-- checkbox,
-- jednoduchý select/radio.
-
-Editor bude používat jednoduché akce:
-
-- přidat,
-- upravit,
-- smazat,
-- posunout nahoru/dolů,
-- náhled,
-- uložit.
-
-Výslovně bez drag-and-drop builderu.
-
-Exit criteria:
-
-- lektor vytvoří novou kartičku bez ruční editace Sheets/JSON.
-
-## M5 — Distribuce kartičky
-
-Výstup:
-
-- akce „Rozdat kartičku“,
-- generovaný QR,
-- případně kopírovatelný odkaz,
-- zobrazení vhodné pro projekci / iPad.
-
-Exit criteria:
-
-- lektor vytvoří kartičku a bez dalších technických kroků ji rozdá účastníkům.
-
-## M6 — Offline QR fallback
-
-Výstup:
-
-- akce „Předat přes QR“,
-- kompaktní verzovaný payload,
-- QR s odpovědí,
-- limit délky a srozumitelné chybové hlášení při překročení kapacity.
-
-Příklad konceptu payloadu:
+Minimální struktura:
 
 ```json
 {
-  "v": 1,
-  "c": "card-id",
-  "r": "response-id",
-  "d": {
-    "field-1": "text"
-  }
+  "form_id": "...",
+  "title": "Kompetence",
+  "instructions": "...",
+  "fields": [
+    {
+      "id": "teacher_view",
+      "type": "textarea",
+      "label": "Pohled učitele",
+      "required": false
+    }
+  ]
 }
 ```
 
-V 0.1 se nebude implementovat multi-QR transport.
+### Google Sheet formuláře
 
-Exit criteria:
+Každý vytvořený formulář má vlastní Google Spreadsheet.
 
-- krátkou odpověď lze předat bez internetu z telefonu účastníka lektorovi.
+Hlavní list `ODPOVĚDI` je human-readable:
 
-## M7 — Import offline odpovědi
+| Tým | pole 1 | pole 2 | pole 3 |
+|---|---|---|---|
+| Tým 1 | ... | ... | ... |
+| Tým 2 | ... | ... | ... |
+
+Pravidla:
+
+- sloupce = pole formuláře,
+- řádky = týmy / odevzdání,
+- počet týmů není předem znám,
+- technická metadata nejsou součástí hlavního pohledu.
+
+Technický list `_META` může obsahovat zejména:
+
+- `form_id`
+- `team_id`
+- `response_id`
+- `timestamp`
+- `source` (`online` / `offline_qr`)
+- verzi schématu
+
+Současný prototypový list `RESPONSES` s `data_json` je technický mezikrok M2, nikoli cílové UX.
+
+## 4. Identita týmu
+
+Počet týmů se předem nenastavuje.
+
+Při prvním otevření formuláře na zařízení vznikne stabilní `team_id`, který se uloží lokálně v prohlížeči. Refresh nesmí vytvořit nový tým.
+
+Server při prvním přijetí nového `team_id` přiřadí čitelné označení:
+
+`team_id → Tým 1 / Tým 2 / Tým 3 ...`
+
+Online i offline QR cesta musí používat stejné `team_id` a skončit ve stejném datasetu.
+
+## 5. Milestone M0 — Scope a architektura
+
+Stav: HOTOVO / průběžně aktualizováno.
 
 Výstup:
 
-- sken offline QR lektorem,
-- dekódování a validace payloadu,
-- kontrola verze a `card_id`,
-- idempotence přes `response_id`,
-- uložení s `source=offline_qr`.
+- scope CoLector 0.1,
+- Apps Script + Sheets architektura,
+- bez vlastní DB,
+- bez účtů účastníků,
+- definice online a offline toku.
 
-Exit criteria:
+## 6. Milestone M1 — QR → mobilní formulář
 
-- stejné QR načtené dvakrát nevytvoří dva záznamy.
+Stav: HOTOVO.
 
-## M8 — Copy / export
+Ověřeno:
+
+- veřejná Web App URL,
+- mobilní vykreslení kartičky,
+- QR / URL otevře správný formulář,
+- mobile-first viewport funguje.
+
+## 7. Milestone M2 — Online submission → Google Sheets
+
+Stav: HOTOVO jako technický vertical slice.
+
+Ověřeno:
+
+- submit formuláře,
+- `response_id`,
+- timestamp,
+- `source=online`,
+- zápis do Google Sheets,
+- základní idempotence.
+
+Poznámka: M2 používá dočasný technický formát `RESPONSES + data_json`. Ten bude nahrazen cílovým per-form Spreadsheet modelem.
+
+# DALŠÍ HLAVNÍ OSA VÝVOJE
+
+## 8. Milestone M3 — Editor formulářů
+
+Cíl:
+
+Zdenda vytvoří nový formulář bez zásahu do kódu, JSON nebo Google Sheets.
+
+### M3.1 — Minimální editor
+
+Editor umožní:
+
+- název formuláře,
+- instrukční text,
+- přidat pole,
+- upravit pole,
+- smazat pole,
+- změnit pořadí nahoru / dolů,
+- označit pole jako povinné / volitelné,
+- náhled formuláře,
+- uložit formulář.
+
+Podporované typy polí pro první verzi:
+
+- krátký text,
+- dlouhý text,
+- checkbox,
+- jednoduchý výběr možností.
+
+Výslovně bez drag-and-drop page builderu.
+
+### M3.2 — `form_schema`
+
+Editor nesmí přímo generovat HTML jako zdroj pravdy.
+
+Výstupem editoru je kanonické `form_schema`, ze kterého se následně generuje participant formulář i hlavička Google Sheet.
+
+### M3.3 — Persistence formulářů
+
+Uložený formulář musí mít:
+
+- stabilní `form_id`,
+- `title`,
+- `instructions`,
+- `schema_json`,
+- stav aktivní / neaktivní,
+- datum vytvoření / úpravy.
+
+Exit criterion M3:
+
+Zdenda vytvoří nový formulář od nuly, uloží jej a participant view se správně vykreslí ze stejného `form_schema`.
+
+## 9. Milestone M4 — Per-form Google Sheet
+
+Cíl:
+
+Po vytvoření formuláře automaticky vytvořit jeho vlastní human-readable Google Spreadsheet.
 
 Výstup:
 
-- „Kopírovat celý dataset kartičky“,
-- jednoduchý text/Markdown vhodný pro ChatGPT,
-- CSV export jako sekundární formát.
+- vazba `form_id → spreadsheet_id`,
+- list `ODPOVĚDI`,
+- první sloupec `Tým`,
+- další sloupce podle pořadí polí ve `form_schema`,
+- technický list `_META`,
+- odkaz „Otevřít Google Sheet“ v CoLectoru.
 
-Exit criteria:
+Exit criterion:
 
-- lektor dostane celý dataset jedním krokem mimo CoLector.
+Nově vytvořený formulář má bez ručního zásahu vlastní správně strukturovaný Google Sheet.
 
-## M9 — Simulovaný a reálný workshop test
+## 10. Milestone M5 — Dynamické týmy + zápis odpovědí
 
-Testovat minimálně:
+Cíl:
 
-- různé Android telefony,
-- iPhone,
-- různé velikosti obrazovky,
-- více současných odeslání,
-- slabé / přerušené připojení,
-- online i offline cestu.
+Napojit existující funkční submit na nový per-form datový model.
 
-Sledovat:
+Výstup:
 
-- čas k otevření,
-- čas k pochopení,
-- čas k vyplnění,
-- chybovost,
-- počet dotazů na lektora,
-- úspěšnost odevzdání.
+- generování stabilního `team_id` na zařízení,
+- persistence `team_id` přes refresh,
+- serverové přiřazení `Tým N`,
+- jeden řádek v `ODPOVĚDI` = jeden tým,
+- hodnoty odpovědí v samostatných čitelných sloupcích,
+- technická metadata v `_META`,
+- ochrana proti duplicitám přes `response_id`.
+
+Exit criterion:
+
+Více zařízení otevře stejný QR, automaticky vzniknou Tým 1, Tým 2, ... a jejich odpovědi se propíší do správných řádků a sloupců.
+
+## 11. Milestone M6 — Distribuce formuláře
+
+Cíl:
+
+Z editoru / seznamu formulářů jedním krokem formulář rozdat.
+
+Výstup:
+
+- akce „Rozdat formulář“,
+- QR s URL konkrétního `form_id`,
+- kopírovatelný odkaz,
+- režim vhodný pro projekci / iPad.
+
+Exit criterion:
+
+Zdenda vytvoří formulář a bez technického kroku jej okamžitě rozdá skupinám.
+
+## 12. Milestone M7 — Import / export formulářů
+
+Import/export formulářů pracuje s definicí formuláře, nikoli s nasbíranými odpověďmi.
+
+Výstup:
+
+- export `form_schema` do přenosného JSON,
+- import validního JSON,
+- nové `form_id` při importu / duplikaci,
+- validace verze schématu,
+- možnost duplikovat formulář.
+
+Exit criterion:
+
+Formulář lze přenést nebo znovu použít bez ruční rekonstrukce.
+
+## 13. Milestone M8 — Vizualizace dat v CoLectoru
+
+Cíl:
+
+Zdenda nemusí kvůli průběžné práci otevírat Google Sheets.
+
+Výstup:
+
+- počet přijatých týmů,
+- tabulka odpovědí,
+- zobrazení po týmech,
+- případně zobrazení po otázkách,
+- refresh / jednoduchý polling,
+- odkaz na zdrojový Google Sheet.
+
+Později lze přidat jednoduché grafy pouze tam, kde dávají smysl pro konkrétní typ pole.
+
+Exit criterion:
+
+Lektor během workshopu vidí aktuální dataset přímo v CoLectoru.
+
+## 14. Milestone M9 — Offline QR fallback
+
+Cíl:
+
+Zachovat nouzovou cestu při absenci internetu.
+
+Tok:
+
+`vyplněný formulář → Předat přes QR → payload s form_id/team_id/response_id/data → lektor načte → zápis do stejného Google Sheet`
+
+Požadavky:
+
+- verzovaný payload,
+- `form_id`,
+- `team_id`,
+- `response_id`,
+- odpovědi,
+- `source=offline_qr`,
+- idempotence,
+- jasný limit délky.
+
+V 0.1 se nebude implementovat multi-QR transport dlouhých payloadů.
+
+## 15. Milestone M10 — Export výsledků
+
+Toto je jiný export než export formuláře.
+
+Výstup:
+
+- otevřít / sdílet Google Sheet,
+- kopírovat dataset,
+- CSV / tabulkový export podle potřeby,
+- jednoduchý text / Markdown pro další zpracování.
+
+Exit criterion:
+
+Po workshopu lze celý čistý dataset získat bez přepisu a bez technických mezikroků.
+
+## 16. Milestone M11 — Workshop test a stabilizace
+
+Testovat:
+
+- Android + iPhone,
+- více zařízení současně,
+- refresh stránky,
+- opakované submitnutí,
+- různé počty týmů,
+- slabé připojení,
+- online i offline cestu,
+- správnou strukturu Sheet.
 
 Cílové chování:
 
-> Lektor řekne „naskenujte QR a vyplňte“ a prakticky nic dalšího nevysvětluje.
+> Zdenda vytvoří formulář → zobrazí QR → libovolný počet týmů jej otevře → vyplní → data se objeví v čitelném Sheet a v CoLectoru.
 
-## Kritérium hotového CoLectoru 0.1
+## 17. Post-0.1 — AI zpracování a report
+
+AI není podmínkou hotového sběrného modulu 0.1.
+
+Po stabilizaci sběru lze přidat další vrstvu:
+
+`Google Sheet / normalizovaný dataset → AI analýza → strukturovaný výstup → report`
+
+Možné funkce:
+
+- tematické třídění,
+- shrnutí,
+- porovnání týmů,
+- identifikace opakujících se témat,
+- návrh závěrů,
+- generování reportu,
+- export reportu do DOCX/PDF nebo jiného cílového formátu.
+
+AI vrstva musí pracovat nad stabilním datovým kontraktem; nesmí určovat strukturu sběru.
+
+## 18. Aktuální pořadí práce
 
 ```text
-lektor vybere / vytvoří kartičku
+M0 architektura                 HOTOVO
 ↓
-zobrazí QR
+M1 QR → mobilní formulář       HOTOVO
 ↓
-účastníci ji otevřou
+M2 submit → Sheets             HOTOVO (technický vertical slice)
 ↓
-vyplní
+M3 EDITOR FORMULÁŘŮ            ← AKTUÁLNÍ
 ↓
-odevzdají online nebo offline QR
+M4 per-form human-readable Sheet
 ↓
-lektor vidí všechny odpovědi
+M5 dynamické týmy + zápis
 ↓
-copy/export
+M6 distribuce QR
 ↓
-další analýza mimo CoLector
+M7 import/export formulářů
+↓
+M8 vizualizace dat
+↓
+M9 offline QR fallback
+↓
+M10 export výsledků
+↓
+M11 workshop test / stabilizace
+↓
+AI zpracování + report
 ```
 
-## Pravidla proti scope creepu
+## 19. Vývojový workflow
 
-Do 0.1 nepřidávat:
+Aktuální opakovatelný tok:
 
-- účty účastníků,
-- organizace / školy jako entity,
-- komplexní workshopy a historii,
-- vlastní databázi,
-- AI integraci,
-- reportovací engine,
-- analytický dashboard,
-- nativní mobilní aplikaci,
-- komplexní permissions,
-- dokumentový management.
+`ChatGPT → GitHub → Replit → npx -y @google/clasp@latest push → Apps Script → nová Web App verze → mobilní test`
 
-Nový požadavek se nejdřív posoudí otázkou:
+GitHub je kanonický source of truth. Apps Script je deployment target.
 
-> Je nutný k ověření workflow digitální kartička → sběr → dataset?
+## 20. Nejbližší implementační krok
 
-Pokud ne, patří do pozdější verze.
+Začít M3.1 — minimálním editorem formulářů.
 
-## Vývojový workflow
+První implementace nemá řešit celý management formulářů. Má vytvořit jedinou lektorskou obrazovku, na které lze:
 
-`ChatGPT → GitHub → Replit → test → GitHub → Google Apps Script → mobilní test → Google Sheets`
+1. zadat název a instrukci,
+2. přidávat / upravovat / mazat / řadit pole,
+3. vidět náhled,
+4. získat validní `form_schema`.
 
-GitHub je kanonický zdroj kódu a projektové dokumentace. Replit je pracovní vývojové prostředí. Google Apps Script je deployment target, nikoli primární editor/source of truth.
+Teprve po ověření editoru se napojí persistence a automatické vytvoření Google Sheet.
