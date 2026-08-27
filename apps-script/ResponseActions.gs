@@ -1,6 +1,5 @@
 const FORM_DATA_REGISTRY_SHEET = 'FORM_DATA';
 const FORM_DATA_REGISTRY_HEADERS = ['form_id', 'spreadsheet_id', 'spreadsheet_url', 'created_at'];
-const PROJECT_FOLDER_ID = '1gh3ItTOvnn7z0WHoA01M79apsNz31WA9';
 
 function submitParticipantResponse(payload) {
   if (!payload || !payload.formId || !payload.teamId || !payload.responseId || !payload.answers) {
@@ -56,8 +55,6 @@ function getOrCreateFormDataSpreadsheet_(formId, schema) {
 
   const title = String(schema.internalTitle || schema.title || 'Formulář').trim() || 'Formulář';
   const spreadsheet = SpreadsheetApp.create('CoLector — ' + title);
-  const file = DriveApp.getFileById(spreadsheet.getId());
-  try { file.moveTo(DriveApp.getFolderById(PROJECT_FOLDER_ID)); } catch (error) {}
 
   const first = spreadsheet.getSheets()[0];
   first.setName('ODPOVĚDI');
