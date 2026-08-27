@@ -139,7 +139,7 @@ function getEditorRouteBootstrap_() {
     scheduleSave();
   });
 })();
-<\/script>`;
+</script>`;
 }
 
 function saveFormDraft(payload) {
