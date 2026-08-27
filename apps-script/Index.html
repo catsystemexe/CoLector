@@ -22,9 +22,18 @@
       label { display: block; font-weight: 700; margin-bottom: 8px; }
       textarea { width: 100%; min-height: 132px; resize: vertical; border: 1px solid #cfd6e4; border-radius: 14px; padding: 14px; font: inherit; font-size: 17px; background: #fff; }
       textarea:focus { outline: 3px solid rgba(31, 122, 99, .16); border-color: #1f7a63; }
-      button { width: 100%; border: 0; border-radius: 14px; padding: 16px; font: inherit; font-weight: 800; font-size: 17px; background: #1f7a63; color: white; }
-      button[disabled] { opacity: .45; }
+      button { width: 100%; border: 0; border-radius: 14px; padding: 16px; font: inherit; font-weight: 800; font-size: 17px; background: #1f7a63; color: white; cursor: pointer; }
+      button[disabled] { opacity: .45; cursor: default; }
       .note { margin-top: 14px; font-size: 13px; color: #7b8497; text-align: center; }
+      .status { margin-top: 14px; padding: 12px 14px; border-radius: 12px; font-size: 14px; display: none; }
+      .status.success { display: block; background: #e8f5ef; color: #135c49; }
+      .status.error { display: block; background: #fdecec; color: #8a2430; }
+      @media (max-width: 600px) {
+        main { max-width: none; padding: 14px 12px 28px; }
+        .card { border-radius: 16px; padding: 18px 16px; }
+        h1 { font-size: 26px; }
+        textarea { min-height: 120px; }
+      }
     </style>
   </head>
   <body>
@@ -33,17 +42,71 @@
       <section class="card">
         <h1><?= card.title ?></h1>
         <p><?= card.instructions ?></p>
-        <form>
+        <form id="responseForm">
           <? for (let i = 0; i < card.fields.length; i++) { const field = card.fields[i]; ?>
             <div class="field">
               <label for="<?= field.id ?>"><?= field.label ?></label>
               <textarea id="<?= field.id ?>" name="<?= field.id ?>"></textarea>
             </div>
           <? } ?>
-          <button type="button" disabled>Odeslat</button>
-          <div class="note">M1 prototyp: ověřujeme pouze QR → mobilní kartička.</div>
+          <button id="submitButton" type="submit">Odeslat</button>
+          <div id="status" class="status" role="status"></div>
+          <div class="note">M2 prototyp: odpověď se ukládá do CoLector DEV — Data.</div>
         </form>
       </section>
     </main>
+
+    <script>
+      const CARD_ID = <?!= JSON.stringify(card.id) ?>;
+      const form = document.getElementById('responseForm');
+      const submitButton = document.getElementById('submitButton');
+      const statusBox = document.getElementById('status');
+
+      function createResponseId() {
+        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return 'r-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      }
+
+      function setStatus(type, message) {
+        statusBox.className = 'status ' + type;
+        statusBox.textContent = message;
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        const answers = {};
+        form.querySelectorAll('textarea').forEach(function (field) {
+          answers[field.name] = field.value;
+        });
+
+        submitButton.disabled = true;
+        submitButton.textContent = 'Odesílám…';
+        statusBox.className = 'status';
+        statusBox.textContent = '';
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            setStatus('success', result && result.duplicate
+              ? 'Tato odpověď už byla přijata.'
+              : 'Odpověď byla odeslána.');
+            form.querySelectorAll('textarea').forEach(function (field) {
+              field.disabled = true;
+            });
+            submitButton.textContent = 'Odesláno';
+          })
+          .withFailureHandler(function (error) {
+            setStatus('error', 'Odeslání se nepodařilo. Zkuste to znovu.');
+            submitButton.disabled = false;
+            submitButton.textContent = 'Odeslat';
+            console.error(error);
+          })
+          .submitResponse({
+            cardId: CARD_ID,
+            responseId: createResponseId(),
+            answers: answers
+          });
+      });
+    </script>
   </body>
 </html>
