@@ -1,0 +1,23 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node tooling if used locally
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# clasp local auth/config artifacts that must not leak secrets
+.clasprc.json
+
+# Temporary files
+*.tmp
+*.log
