@@ -57,9 +57,11 @@
       if(currentSchema.instructions){const p=document.createElement('p');p.className='instructions';p.textContent=currentSchema.instructions;sheet.appendChild(p)}
       const fields=document.createElement('div');fields.className='fields';(currentSchema.fields||[]).forEach(field=>{const rendered=renderField(field);if(rendered)fields.appendChild(rendered)});sheet.appendChild(fields);
       const wrap=document.createElement('div');wrap.className='submit-wrap';const button=document.createElement('button');button.type='button';button.className='submit';button.textContent='Odeslat';const status=document.createElement('div');status.className='submit-state';wrap.append(button,status);sheet.appendChild(wrap);
+      const teamId=getTeamId();
+      google.script.run.withFailureHandler(()=>{}).registerParticipantOpen({formId:FORM_ID,teamId:teamId});
       button.onclick=()=>{
         button.disabled=true;button.textContent='Odesílám…';status.className='submit-state';status.textContent='';
-        const payload={formId:FORM_ID,teamId:getTeamId(),responseId:makeId('response'),answers:collectAnswers()};
+        const payload={formId:FORM_ID,teamId:teamId,responseId:makeId('response'),answers:collectAnswers()};
         google.script.run.withSuccessHandler(result=>{button.textContent='Odesláno';status.className='submit-state success';status.textContent=(result&&result.teamLabel?result.teamLabel+': ':'')+'odpověď byla uložena.'}).withFailureHandler(error=>{button.disabled=false;button.textContent='Odeslat';status.className='submit-state error';status.textContent=(error&&error.message)||'Odeslání se nepodařilo.'}).submitParticipantResponse(payload);
       };
     }
