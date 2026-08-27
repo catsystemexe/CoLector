@@ -1,4 +1,5 @@
 const SPREADSHEET_ID = '1YWlpsu_LbDOVtf4dE6f0iqzJYyasfhJ4-gCWZVib0sk';
+const APP_ICON_URL = 'https://raw.githubusercontent.com/catsystemexe/CoLector/46ca266e143f3a528c3d5fa792fdf09faac81217/assets/apple-touch-icon.png';
 const RESPONSES_SHEET = 'RESPONSES';
 const FORMS_SHEET = 'FORMS';
 const FORMS_HEADERS = [
@@ -21,7 +22,7 @@ function doGet(e) {
   if (view === 'forms') return renderTemplatePage_('Forms', 'CoLector — Moje formuláře');
   if (view === 'data') return renderTemplatePage_('Data', 'CoLector — Data a výsledky');
   if (view === 'form') return renderParticipant_(params.form || '');
-  if (view === 'home' || (!view && !params.card)) return renderTemplatePage_('Home', 'CoLector — Home');
+  if (view === 'home' || (!view && !params.card)) return renderTemplatePage_('Home', 'CoLector');
 
   const cardId = params.card || 'kompetence';
   const cards = getPrototypeCards_();
@@ -30,6 +31,7 @@ function doGet(e) {
   template.card = card;
 
   return template.evaluate().setTitle('CoLector')
+    .setFaviconUrl(APP_ICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -38,6 +40,7 @@ function renderTemplatePage_(fileName, title) {
   const template = HtmlService.createTemplateFromFile(fileName);
   template.appUrl = ScriptApp.getService().getUrl();
   return template.evaluate().setTitle(title)
+    .setFaviconUrl(APP_ICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -47,6 +50,7 @@ function renderParticipant_(formId) {
   template.formId = formId;
   template.appUrl = ScriptApp.getService().getUrl();
   return template.evaluate().setTitle('CoLector — Formulář')
+    .setFaviconUrl(APP_ICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -55,6 +59,7 @@ function renderEditor_() {
   const baseHtml = HtmlService.createHtmlOutputFromFile('Admin').getContent();
   const html = baseHtml.replace('</body>', getEditorRouteBootstrap_() + '\n</body>');
   return HtmlService.createHtmlOutput(html).setTitle('CoLector — Editor formuláře')
+    .setFaviconUrl(APP_ICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -250,24 +255,22 @@ function getFormDraft(formId) {
   let schema = null;
   try {schema = JSON.parse(values[3] || '{}');} catch (error) {throw new Error('Uložený form_schema není validní JSON.');}
   return {
-    formId:values[0],internalTitle:values[1],title:values[2],schema,status:values[4],
-    createdAt:values[5] instanceof Date ? values[5].toISOString() : values[5],
-    updatedAt:values[6] instanceof Date ? values[6].toISOString() : values[6],
-    publishedAt:values[8] instanceof Date ? values[8].toISOString() : values[8]
+    formId:values[0],internalTitle:values[1]||'',title:values[2]||'',schema:schema,status:values[4]||'draft',
+    createdAt:toIso_(values[5]),updatedAt:toIso_(values[6]),publishedAt:toIso_(values[8])
   };
 }
 
 function getPublishedForm(formId) {
-  if (!formId) throw new Error('Chybí form_id.');
+  if (!formId) return null;
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateFormsSheet_(spreadsheet);
   const rowIndex = findFormRow_(sheet, formId);
   if (!rowIndex) return null;
   const values = sheet.getRange(rowIndex,1,1,FORMS_HEADERS.length).getValues()[0];
   if (!values[7]) return null;
-  let schema;
-  try {schema=JSON.parse(values[7]);} catch (error) {throw new Error('Publikovaný formulář není validní JSON.');}
-  return {formId:values[0],schema: schema,publishedAt:values[8] instanceof Date ? values[8].toISOString() : values[8]};
+  let schema = null;
+  try {schema=JSON.parse(values[7]);} catch(error){throw new Error('Publikovaný form_schema není validní JSON.');}
+  return {formId:values[0],schema:schema,publishedAt:toIso_(values[8])};
 }
 
 function listFormDrafts() {
@@ -275,42 +278,94 @@ function listFormDrafts() {
   const sheet = getOrCreateFormsSheet_(spreadsheet);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  return sheet.getRange(2, 1, lastRow - 1, FORMS_HEADERS.length).getValues().filter(row => row[0]).map(row => ({
-    formId:row[0],internalTitle:row[1],title:row[2],status:row[4],
-    createdAt:row[5] instanceof Date ? row[5].toISOString() : row[5],
-    updatedAt:row[6] instanceof Date ? row[6].toISOString() : row[6],
-    publishedAt:row[8] instanceof Date ? row[8].toISOString() : row[8]
-  })).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  const values = sheet.getRange(2, 1, lastRow - 1, FORMS_HEADERS.length).getValues();
+  return values.map(row => {
+    let schema = {};
+    try {schema = JSON.parse(row[3] || '{}');} catch (error) {}
+    return {
+      formId:row[0],internalTitle:row[1]||schema.internalTitle||'',title:row[2]||schema.title||'',status:row[4]||'draft',
+      createdAt:toIso_(row[5]),updatedAt:toIso_(row[6]),publishedAt:toIso_(row[8])
+    };
+  }).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
 }
 
 function getOrCreateFormsSheet_(spreadsheet) {
   let sheet = spreadsheet.getSheetByName(FORMS_SHEET);
-  if (!sheet) {
-    sheet=spreadsheet.insertSheet(FORMS_SHEET);
-    sheet.getRange(1,1,1,FORMS_HEADERS.length).setValues([FORMS_HEADERS]);
-    sheet.setFrozenRows(1);
-  } else {
-    sheet.getRange(1,1,1,FORMS_HEADERS.length).setValues([FORMS_HEADERS]);
-    sheet.setFrozenRows(1);
-  }
+  if (!sheet) sheet = spreadsheet.insertSheet(FORMS_SHEET);
+  const currentWidth = sheet.getLastColumn();
+  const width = Math.max(currentWidth, FORMS_HEADERS.length);
+  const existing = currentWidth ? sheet.getRange(1,1,1,currentWidth).getValues()[0] : [];
+  let changed = existing.length < FORMS_HEADERS.length;
+  FORMS_HEADERS.forEach((header,index)=>{if(existing[index]!==header)changed=true;});
+  if (changed) sheet.getRange(1,1,1,FORMS_HEADERS.length).setValues([FORMS_HEADERS]);
+  sheet.setFrozenRows(1);
   return sheet;
 }
 
 function findFormRow_(sheet, formId) {
-  const lastRow=sheet.getLastRow();if(lastRow<2)return 0;
-  const ids=sheet.getRange(2,1,lastRow-1,1).getValues().flat();const index=ids.indexOf(formId);return index===-1?0:index+2;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
+  const index = ids.indexOf(formId);
+  return index === -1 ? 0 : index + 2;
 }
 
-function submitResponse(payload) {
-  if (!payload || !payload.cardId || !payload.responseId || !payload.answers) throw new Error('Neplatná odpověď.');
-  const spreadsheet=SpreadsheetApp.openById(SPREADSHEET_ID);const sheet=spreadsheet.getSheetByName(RESPONSES_SHEET);if(!sheet)throw new Error('List RESPONSES nebyl nalezen.');
-  const lock=LockService.getScriptLock();lock.waitLock(10000);
+function toIso_(value) {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function saveResponse(payload) {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(RESPONSES_SHEET);
+
+  if (!sheet) throw new Error('Chybí list RESPONSES.');
+  if (!payload || !payload.card_id || !payload.response_id || !payload.data) {
+    throw new Error('Neplatná odpověď.');
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+
   try {
-    const lastRow=sheet.getLastRow();if(lastRow>1){const existingIds=sheet.getRange(2,3,lastRow-1,1).getValues().flat();if(existingIds.includes(payload.responseId))return{ok:true,duplicate:true};}
-    sheet.appendRow([new Date(),payload.cardId,payload.responseId,'online',JSON.stringify(payload.answers)]);return{ok:true,duplicate:false};
-  } finally {lock.releaseLock();}
+    if (responseExists_(sheet, payload.response_id)) {
+      return { ok: true, duplicate: true };
+    }
+
+    sheet.appendRow([
+      new Date(),
+      payload.card_id,
+      payload.response_id,
+      'online',
+      JSON.stringify(payload.data)
+    ]);
+
+    return { ok: true, duplicate: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function responseExists_(sheet, responseId) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false;
+  const values = sheet.getRange(2, 3, lastRow - 1, 1).getValues();
+  return values.some(row => row[0] === responseId);
 }
 
 function getPrototypeCards_() {
-  return {kompetence:{id:'kompetence',title:'Kompetence',instructions:'Sepište stručně pohled skupiny.',fields:[{id:'teacher_view',type:'textarea',label:'Pohled učitele'},{id:'assistant_view',type:'textarea',label:'Pohled asistenta'},{id:'clarify',type:'textarea',label:'Co je potřeba vyjasnit?'}]}};
+  return {
+    kompetence: {
+      id: 'kompetence',
+      title: 'Kompetence v inkluzivním vzdělávání',
+      subtitle: 'Popište zkušenost z praxe.',
+      fields: [
+        { id: 'teacher_view', label: 'Jak situaci vnímáte?', type: 'textarea' },
+        { id: 'clarify', label: 'Co byste potřebovali upřesnit?', type: 'textarea' },
+        { id: 'assistant_view', label: 'Jak byste situaci vysvětlili kolegovi?', type: 'textarea' }
+      ]
+    }
+  };
 }
