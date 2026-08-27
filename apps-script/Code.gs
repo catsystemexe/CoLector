@@ -9,6 +9,7 @@ function doGet(e) {
   return template
     .evaluate()
     .setTitle('CoLector')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
