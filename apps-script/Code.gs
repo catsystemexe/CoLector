@@ -67,10 +67,24 @@ function renderEditor_() {
 }
 
 function getEditorRouteBootstrap_() {
+  const appUrl = ScriptApp.getService().getUrl();
   return `<script>
 (function(){
   clearTimeout(saveTimer);
   saveTimer=null;
+
+  const homeBrand=document.querySelector('.brand-wrap');
+  if(homeBrand){
+    homeBrand.style.cursor='pointer';
+    homeBrand.setAttribute('role','link');
+    homeBrand.setAttribute('tabindex','0');
+    homeBrand.setAttribute('aria-label','Přejít na Home');
+    const goHome=function(){window.top.location.href=${JSON.stringify(appUrl)}+'?view=home'};
+    homeBrand.addEventListener('click',goHome);
+    homeBrand.addEventListener('keydown',function(event){
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();goHome()}
+    });
+  }
 
   function applyEditorSchema(schema){
     clearTimeout(saveTimer);
