@@ -15,10 +15,40 @@
   <script>
     const FORM_ID=<?!= JSON.stringify(formId) ?>;
     const TEAM_KEY='colector.team.id';
+    const PARTICIPANT_KEY='colector.participant.'+FORM_ID;
     const sheet=document.getElementById('sheet');
     let currentSchema=null;
+    let participantState=null;
+    let saveTimer=null;
+
     function makeId(prefix){return prefix+'_'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+Math.random().toString(36).slice(2))}
     function getTeamId(){try{let id=localStorage.getItem(TEAM_KEY);if(!id){id=makeId('team');localStorage.setItem(TEAM_KEY,id)}return id}catch(e){return makeId('team')}}
+    function readParticipantState(){
+      try{
+        const raw=localStorage.getItem(PARTICIPANT_KEY);
+        if(!raw)return null;
+        const value=JSON.parse(raw);
+        return value&&typeof value==='object'?value:null;
+      }catch(e){return null}
+    }
+    function writeParticipantState(){
+      if(!participantState)return;
+      participantState.updatedAt=new Date().toISOString();
+      try{localStorage.setItem(PARTICIPANT_KEY,JSON.stringify(participantState))}catch(e){}
+    }
+    function getParticipantState(){
+      const saved=readParticipantState()||{};
+      participantState={
+        teamId:saved.teamId||getTeamId(),
+        responseId:saved.responseId||makeId('response'),
+        status:saved.status==='submitted'?'submitted':'draft',
+        answers:saved.answers&&typeof saved.answers==='object'?saved.answers:{},
+        teamLabel:saved.teamLabel||'',
+        updatedAt:saved.updatedAt||''
+      };
+      writeParticipantState();
+      return participantState;
+    }
     function safeAccent(value){return['blue','green','purple','orange','red'].includes(value)?value:'blue'}
     function fieldTitle(field){if(!field.label)return null;const el=document.createElement('div');el.className='field-title';el.textContent=field.label;return el}
     function renderField(field){
@@ -50,19 +80,64 @@
       });
       return answers;
     }
+    function restoreAnswers(answers){
+      const saved=answers||{};
+      (currentSchema.fields||[]).forEach(field=>{
+        if(!field.id||!(field.id in saved))return;
+        const value=saved[field.id];
+        if(field.type==='textarea'){
+          const el=sheet.querySelector('textarea[name="'+CSS.escape(field.id)+'"]');if(el)el.value=value==null?'':String(value);
+        }else if(field.type==='checkbox'){
+          const selected=Array.isArray(value)?value.map(String):[];
+          sheet.querySelectorAll('input[type="checkbox"][name="'+CSS.escape(field.id)+'"]').forEach(el=>{el.checked=selected.includes(String(el.value))});
+        }else if(field.type==='yes_no'){
+          const el=sheet.querySelector('input[type="radio"][name="'+CSS.escape(field.id)+'"][value="'+CSS.escape(String(value||''))+'"]');if(el)el.checked=true;
+        }
+      });
+    }
+    function saveDraft(){
+      if(!participantState||participantState.status==='submitted'||!currentSchema)return;
+      participantState.answers=collectAnswers();
+      writeParticipantState();
+    }
+    function scheduleDraftSave(){
+      clearTimeout(saveTimer);
+      saveTimer=setTimeout(saveDraft,120);
+    }
+    function bindDraftPersistence(){
+      sheet.addEventListener('input',scheduleDraftSave);
+      sheet.addEventListener('change',scheduleDraftSave);
+      window.addEventListener('pagehide',saveDraft);
+    }
+    function renderSubmitted(){
+      sheet.innerHTML='';
+      if(currentSchema&&currentSchema.title){const h=document.createElement('h1');h.textContent=currentSchema.title;sheet.appendChild(h)}
+      const label=participantState&&participantState.teamLabel?participantState.teamLabel+': ':'';
+      const state=document.createElement('div');state.className='state';state.innerHTML='<strong>Odpověď byla odeslána</strong>'+label+'formulář je pro tento tým uzavřený.';sheet.appendChild(state);
+    }
     function render(result){
       if(!result||!result.schema){sheet.innerHTML='<div class="state"><strong>Formulář není dostupný</strong>Formulář zatím nebyl publikován nebo už neexistuje.</div>';return}
-      currentSchema=result.schema;sheet.innerHTML='';
+      currentSchema=result.schema;
+      participantState=getParticipantState();
+      if(participantState.status==='submitted'){renderSubmitted();return}
+      sheet.innerHTML='';
       if(currentSchema.title){const h=document.createElement('h1');h.textContent=currentSchema.title;sheet.appendChild(h)}
       if(currentSchema.instructions){const p=document.createElement('p');p.className='instructions';p.textContent=currentSchema.instructions;sheet.appendChild(p)}
       const fields=document.createElement('div');fields.className='fields';(currentSchema.fields||[]).forEach(field=>{const rendered=renderField(field);if(rendered)fields.appendChild(rendered)});sheet.appendChild(fields);
+      restoreAnswers(participantState.answers);
+      bindDraftPersistence();
       const wrap=document.createElement('div');wrap.className='submit-wrap';const button=document.createElement('button');button.type='button';button.className='submit';button.textContent='Odeslat';const status=document.createElement('div');status.className='submit-state';wrap.append(button,status);sheet.appendChild(wrap);
-      const teamId=getTeamId();
-      google.script.run.withFailureHandler(()=>{}).registerParticipantOpen({formId:FORM_ID,teamId:teamId});
+      google.script.run.withSuccessHandler(result=>{if(result&&result.teamLabel){participantState.teamLabel=result.teamLabel;writeParticipantState()}}).withFailureHandler(()=>{}).registerParticipantOpen({formId:FORM_ID,teamId:participantState.teamId});
       button.onclick=()=>{
+        saveDraft();
         button.disabled=true;button.textContent='Odesílám…';status.className='submit-state';status.textContent='';
-        const payload={formId:FORM_ID,teamId:teamId,responseId:makeId('response'),answers:collectAnswers()};
-        google.script.run.withSuccessHandler(result=>{button.textContent='Odesláno';status.className='submit-state success';status.textContent=(result&&result.teamLabel?result.teamLabel+': ':'')+'odpověď byla uložena.'}).withFailureHandler(error=>{button.disabled=false;button.textContent='Odeslat';status.className='submit-state error';status.textContent=(error&&error.message)||'Odeslání se nepodařilo.'}).submitParticipantResponse(payload);
+        const payload={formId:FORM_ID,teamId:participantState.teamId,responseId:participantState.responseId,answers:participantState.answers};
+        google.script.run.withSuccessHandler(result=>{
+          if(result&&result.teamLabel)participantState.teamLabel=result.teamLabel;
+          participantState.status='submitted';
+          writeParticipantState();
+          renderSubmitted();
+        }).withFailureHandler(error=>{button.disabled=false;button.textContent='Odeslat';status.className='submit-state error';status.textContent=(error&&error.message)||'Odeslání se nepodařilo.'}).submitParticipantResponse(payload);
       };
     }
     function fail(){sheet.innerHTML='<div class="state"><strong>Formulář se nepodařilo načíst</strong>Zkuste stránku obnovit.</div>'}
