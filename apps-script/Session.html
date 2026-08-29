@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#079EAE">
+  <title>CoLector — Session</title>
+
+  <style>
+    :root{
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:#182238;
+      background:#f4f6fb;
+      --accent:#079EAE;
+      --header:72px;
+      --bottom:82px;
+      --line:#e3e7ef;
+      --muted:#748096;
+    }
+
+    *{box-sizing:border-box}
+
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:#f4f6fb;
+    }
+
+    body{
+      overflow:hidden;
+    }
+
+    button{font:inherit}
+
+    /* HEADER */
+    .session-header{
+      position:fixed;
+      z-index:50;
+      top:0;
+      left:0;
+      right:0;
+      height:var(--header);
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      background:#fff;
+      border-bottom:1px solid #e6e9f0;
+      box-shadow:0 2px 12px rgba(28,38,64,.05);
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:7px;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+
+    .brand-mark{
+      width:46px;
+      height:46px;
+      flex:0 0 auto;
+    }
+
+    .brand-mark svg{
+      display:block;
+      width:100%;
+      height:100%;
+    }
+
+    .section-name{
+      font-size:16px;
+      color:#667288;
+      font-weight:650;
+    }
+
+    .teams{
+      min-width:0;
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
+      gap:5px;
+    }
+
+    .team{
+      position:relative;
+      width:42px;
+      height:42px;
+      flex:0 0 42px;
+      border-radius:12px;
+      border:1px solid #cdd9ed;
+      background:#eef5ff;
+      color:#2671d9;
+      display:grid;
+      place-items:center;
+      padding:0;
+    }
+
+    .team svg{
+      width:22px;
+      height:22px;
+      fill:none;
+      stroke:currentColor;
+      stroke-width:1.9;
+    }
+
+    .team.submitted{
+      border-color:#bce6cd;
+      background:#effaf3;
+      color:#23975b;
+      cursor:pointer;
+    }
+
+    .team.working{
+      cursor:default;
+    }
+
+    .team.selected{
+      outline:2px solid #079EAE;
+      outline-offset:2px;
+    }
+
+    .team-check{
+      position:absolute;
+      right:-3px;
+      bottom:-3px;
+      width:15px;
+      height:15px;
+      border-radius:50%;
+      background:#20a35e;
+      color:#fff;
+      display:grid;
+      place-items:center;
+      font-size:10px;
+      font-weight:900;
+      border:2px solid #fff;
+    }
+
+    .team-number{
+      position:absolute;
+      left:2px;
+      top:1px;
+      font-size:9px;
+      font-weight:850;
+    }
+
+    .qr-button{
+      width:46px;
+      height:46px;
+      border:0;
+      border-radius:13px;
+      background:#e7f8f8;
+      color:#078f9f;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+    }
+
+    .qr-button svg{
+      width:25px;
+      height:25px;
+      fill:none;
+      stroke:currentColor;
+      stroke-width:1.8;
+    }
+
+    /* CONTENT */
+    main{
+      position:fixed;
+      top:var(--header);
+      bottom:var(--bottom);
+      left:0;
+      right:0;
+      overflow-y:auto;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+      padding:12px 10px 22px;
+    }
+
+    .content{
+      width:min(100%,680px);
+      margin:0 auto;
+    }
+
+    .empty{
+      margin-top:22px;
+      padding:28px 20px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:20px;
+      text-align:center;
+      color:var(--muted);
+      box-shadow:0 8px 24px rgba(26,37,62,.05);
+    }
+
+    .empty strong{
+      display:block;
+      color:#27334a;
+      margin-bottom:6px;
+      font-size:18px;
+    }
+
+    .sheet{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:20px;
+      padding:20px 14px 26px;
+      box-shadow:0 8px 28px rgba(26,37,62,.055);
+    }
+
+    .sheet-head{
+      margin-bottom:18px;
+      padding-bottom:14px;
+      border-bottom:1px solid var(--line);
+    }
+
+    .sheet-title{
+      margin:0;
+      font-size:26px;
+      line-height:1.12;
+      color:#27334a;
+    }
+
+    .sheet-team{
+      margin-top:6px;
+      color:#279263;
+      font-weight:750;
+      font-size:14px;
+    }
+
+    .instructions{
+      margin:8px 0 0;
+      color:#6f7a8f;
+      line-height:1.45;
+      white-space:pre-wrap;
+    }
+
+    .fields{
+      display:grid;
+      gap:14px;
+    }
+
+    .field{
+      border:1px solid rgba(133,145,165,.18);
+      border-radius:15px;
+      padding:14px;
+    }
+
+    .field-title{
+      font-weight:780;
+      margin-bottom:10px;
+      color:#2d374b;
+      line-height:1.3;
+    }
+
+    .answer-text{
+      min-height:82px;
+      border:1px solid rgba(133,145,165,.22);
+      border-radius:11px;
+      padding:12px 13px;
+      background:rgba(255,255,255,.76);
+      color:#2e3748;
+      white-space:pre-wrap;
+      line-height:1.45;
+    }
+
+    .checks{
+      display:grid;
+      gap:8px;
+    }
+
+    .check{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-height:42px;
+      padding:8px 10px;
+      border:1px solid rgba(133,145,165,.20);
+      border-radius:10px;
+      background:rgba(255,255,255,.68);
+    }
+
+    .check-box{
+      width:20px;
+      height:20px;
+      border:2px solid #adb6c6;
+      border-radius:5px;
+      flex:0 0 auto;
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:13px;
+      font-weight:900;
+    }
+
+    .check.selected .check-box{
+      background:#079EAE;
+      border-color:#079EAE;
+    }
+
+    .yesno{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:9px;
+    }
+
+    .yesno-item{
+      min-height:48px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid rgba(133,145,165,.25);
+      border-radius:12px;
+      color:#687287;
+      font-weight:750;
+      background:rgba(255,255,255,.7);
+    }
+
+    .yesno-item.selected{
+      border-color:#8bd5d4;
+      background:#eaf8f7;
+      color:#078f9f;
+    }
+
+    .accent-blue{background:#f2f5ff}
+    .accent-green{background:#f0f8f4}
+    .accent-purple{background:#f6f1fb}
+    .accent-orange{background:#fff5e9}
+    .accent-red{background:#fff0f1}
+
+    /* RESERVED BOTTOM DOCK */
+    .bottom-dock{
+      position:fixed;
+      z-index:40;
+      left:0;
+      right:0;
+      bottom:0;
+      height:var(--bottom);
+      background:rgba(255,255,255,.98);
+      border-top:1px solid #e2e6ee;
+      box-shadow:0 -5px 20px rgba(28,38,64,.06);
+    }
+
+    /* QR */
+    .qr-screen{
+      position:fixed;
+      z-index:100;
+      inset:0;
+      background:#fff;
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:24px 18px;
+    }
+
+    .qr-screen.open{display:flex}
+
+    .qr-close{
+      position:absolute;
+      top:14px;
+      right:14px;
+      width:44px;
+      height:44px;
+      border:0;
+      border-radius:12px;
+      background:#f1f3f8;
+      color:#556178;
+      font-size:26px;
+    }
+
+    .qr-title{
+      margin:0 0 20px;
+      text-align:center;
+      font-size:26px;
+      color:#27334a;
+    }
+
+    .qr-box{
+      padding:14px;
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 10px 34px rgba(25,35,58,.12);
+    }
+
+    @media(max-width:620px){
+      :root{
+        --header:68px;
+        --bottom:78px;
+      }
+
+      .session-header{
+        padding:7px 8px;
+        gap:5px;
+      }
+
+      .brand-mark{
+        width:43px;
+        height:43px;
+      }
+
+      .section-name{
+        font-size:14px;
+      }
+
+      .teams{
+        gap:3px;
+      }
+
+      .team{
+        width:36px;
+        height:36px;
+        flex-basis:36px;
+        border-radius:10px;
+      }
+
+      .team svg{
+        width:19px;
+        height:19px;
+      }
+
+      .qr-button{
+        width:41px;
+        height:41px;
+      }
+
+      .qr-button svg{
+        width:23px;
+        height:23px;
+      }
+
+      main{
+        padding:10px 8px 20px;
+      }
+    }
+
+    @media(max-width:420px){
+      .brand{
+        gap:4px;
+      }
+
+      .brand-mark{
+        width:39px;
+        height:39px;
+      }
+
+      .section-name{
+        font-size:13px;
+      }
+
+      .team{
+        width:32px;
+        height:32px;
+        flex-basis:32px;
+      }
+
+      .team svg{
+        width:17px;
+        height:17px;
+      }
+
+      .qr-button{
+        width:37px;
+        height:37px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="session-header">
+    <div id="homeBrand" class="brand" role="link" tabindex="0" aria-label="Přejít na Home">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 256 256">
+          <defs>
+            <linearGradient id="sessionBrandGradient" x1="20%" y1="10%" x2="85%" y2="90%">
+              <stop offset="0%" stop-color="#12B8B5"/>
+              <stop offset="52%" stop-color="#069EAE"/>
+              <stop offset="100%" stop-color="#087CA8"/>
+            </linearGradient>
+          </defs>
+          <rect x="16" y="16" width="224" height="224" rx="48" fill="url(#sessionBrandGradient)"/>
+          <path d="M128 69 L180 99 Q186 103 180 107 L128 137 L76 107 Q70 103 76 99 Z" fill="#fff"/>
+          <path d="M78 126 L128 155 L178 126 L178 140 L128 169 L78 140 Z" fill="#fff"/>
+          <path d="M78 151 L128 180 L178 151 L178 165 L128 194 L78 165 Z" fill="#fff"/>
+        </svg>
+      </div>
+      <span class="section-name">/ Session</span>
+    </div>
+
+    <div id="teams" class="teams"></div>
+
+    <button id="qrButton" class="qr-button" type="button" aria-label="QR kód">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/>
+        <path d="M15 14h2v2h-2zM19 14h2v4h-2zM14 19h4v2h-4zM20 20h1v1h-1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <main>
+    <div id="content" class="content">
+      <div class="empty"><strong>Načítám session…</strong></div>
+    </div>
+  </main>
+
+  <div class="bottom-dock" aria-hidden="true"></div>
+
+  <div id="qrScreen" class="qr-screen">
+    <button id="qrClose" class="qr-close" type="button" aria-label="Zavřít">×</button>
+    <h1 id="qrTitle" class="qr-title"></h1>
+    <div id="qrBox" class="qr-box"></div>
+  </div>
+
+  <script>
+    const APP_URL=<?!= JSON.stringify(appUrl) ?>;
+    const FORM_ID=<?!= JSON.stringify(formId) ?>;
+
+    const teamsEl=document.getElementById('teams');
+    const contentEl=document.getElementById('content');
+    const qrScreen=document.getElementById('qrScreen');
+    const qrBox=document.getElementById('qrBox');
+    const qrTitle=document.getElementById('qrTitle');
+
+    let sessionData=null;
+    let selectedTeamId='';
+
+    function goHome(){
+      window.top.location.href=APP_URL+'?view=home';
+    }
+
+    function participantUrl(){
+      return APP_URL+'?view=form&form='+encodeURIComponent(FORM_ID);
+    }
+
+    function safeAccent(value){
+      return ['blue','green','purple','orange','red'].includes(value)?value:'blue';
+    }
+
+    function teamNumber(label,index){
+      const match=String(label||'').match(/(\d+)/);
+      return match?match[1]:String(index+1);
+    }
+
+    function teamIcon(){
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 18c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="9" r="3"/><path d="M18 11c1.7.4 3 2 3 3.9M6 11c-1.7.4-3 2-3 3.9"/></svg>';
+    }
+
+    function renderTeams(){
+      teamsEl.innerHTML='';
+
+      const teams=(sessionData&&sessionData.teams)||[];
+
+      teams.slice(0,5).forEach((team,index)=>{
+        const button=document.createElement('button');
+        button.type='button';
+        button.className='team '+(team.submitted?'submitted':'working');
+        button.title=team.teamLabel+(team.submitted?' — odevzdáno':' — pracuje');
+        button.setAttribute('aria-label',button.title);
+        button.innerHTML='<span class="team-number">'+teamNumber(team.teamLabel,index)+'</span>'+teamIcon();
+
+        if(team.submitted){
+          button.innerHTML+='<span class="team-check">✓</span>';
+
+          if(team.teamId===selectedTeamId){
+            button.classList.add('selected');
+          }
+
+          button.onclick=()=>{
+            selectedTeamId=team.teamId;
+            renderTeams();
+            renderSelectedTeam();
+          };
+        }else{
+          button.disabled=true;
+        }
+
+        teamsEl.appendChild(button);
+      });
+    }
+
+    function fieldTitle(field){
+      const el=document.createElement('div');
+      el.className='field-title';
+      el.textContent=field.label||'';
+      return el;
+    }
+
+    function renderField(field,answers){
+      const wrap=document.createElement('section');
+      wrap.className='field accent-'+safeAccent(field.accent);
+
+      if(field.label){
+        wrap.appendChild(fieldTitle(field));
+      }
+
+      const value=answers ? answers[field.id] : null;
+
+      if(field.type==='textarea'){
+        const box=document.createElement('div');
+        box.className='answer-text';
+        box.textContent=value==null?'':String(value);
+        wrap.appendChild(box);
+        return wrap;
+      }
+
+      if(field.type==='checkbox'){
+        const checks=document.createElement('div');
+        checks.className='checks';
+
+        const selected=Array.isArray(value)?value.map(String):[];
+
+        (field.options||[]).forEach(option=>{
+          const optionId=String(option.id||option.label||'');
+          const row=document.createElement('div');
+          row.className='check'+(selected.includes(optionId)?' selected':'');
+
+          const box=document.createElement('span');
+          box.className='check-box';
+          box.textContent=selected.includes(optionId)?'✓':'';
+
+          const text=document.createElement('span');
+          text.textContent=option.label||'';
+
+          row.append(box,text);
+          checks.appendChild(row);
+        });
+
+        wrap.appendChild(checks);
+        return wrap;
+      }
+
+      if(field.type==='yes_no'){
+        const group=document.createElement('div');
+        group.className='yesno';
+
+        [
+          {value:'yes',label:'Ano'},
+          {value:'no',label:'Ne'}
+        ].forEach(item=>{
+          const el=document.createElement('div');
+          el.className='yesno-item'+(String(value||'')===item.value?' selected':'');
+          el.textContent=item.label;
+          group.appendChild(el);
+        });
+
+        wrap.appendChild(group);
+        return wrap;
+      }
+
+      return null;
+    }
+
+    function renderSelectedTeam(){
+      if(!sessionData){
+        return;
+      }
+
+      const team=sessionData.teams.find(item=>item.teamId===selectedTeamId);
+      const response=sessionData.answersByTeam[selectedTeamId];
+
+      if(!team || !team.submitted || !response){
+        contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong>Kartu zobrazíš kliknutím na zelený odevzdaný tým nahoře.</div>';
+        return;
+      }
+
+      const schema=sessionData.schema||{};
+      contentEl.innerHTML='';
+
+      const sheet=document.createElement('section');
+      sheet.className='sheet';
+
+      const head=document.createElement('div');
+      head.className='sheet-head';
+
+      const title=document.createElement('h1');
+      title.className='sheet-title';
+      title.textContent=schema.title||schema.internalTitle||team.teamLabel;
+
+      const teamInfo=document.createElement('div');
+      teamInfo.className='sheet-team';
+      teamInfo.textContent=team.teamLabel+' — odevzdáno';
+
+      head.append(title,teamInfo);
+
+      if(schema.instructions){
+        const instructions=document.createElement('p');
+        instructions.className='instructions';
+        instructions.textContent=schema.instructions;
+        head.appendChild(instructions);
+      }
+
+      sheet.appendChild(head);
+
+      const fields=document.createElement('div');
+      fields.className='fields';
+
+      (schema.fields||[]).forEach(field=>{
+        const rendered=renderField(field,response.answers||{});
+        if(rendered)fields.appendChild(rendered);
+      });
+
+      sheet.appendChild(fields);
+      contentEl.appendChild(sheet);
+    }
+
+    function renderSession(result){
+      sessionData=result;
+
+      const submitted=(result.teams||[]).filter(team=>team.submitted);
+
+      if(selectedTeamId && !submitted.some(team=>team.teamId===selectedTeamId)){
+        selectedTeamId='';
+      }
+
+      if(!selectedTeamId && submitted.length){
+        selectedTeamId=submitted[0].teamId;
+      }
+
+      renderTeams();
+
+      if((result.teams||[]).length===0){
+        contentEl.innerHTML='<div class="empty"><strong>Zatím žádný tým</strong>Po otevření formuláře prvním týmem se jeho stav objeví nahoře.</div>';
+        return;
+      }
+
+      renderSelectedTeam();
+    }
+
+    function loadSession(){
+      google.script.run
+        .withSuccessHandler(renderSession)
+        .withFailureHandler(error=>{
+          contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+
+            ((error&&error.message)||'Zkuste stránku obnovit.')+
+            '</div>';
+        })
+        .getSessionView(FORM_ID);
+    }
+
+    function loadQrLibrary(){
+      if(window.QRCode)return Promise.resolve();
+
+      return new Promise((resolve,reject)=>{
+        const existing=document.querySelector('script[data-colector-qr]');
+
+        if(existing){
+          existing.addEventListener('load',resolve,{once:true});
+          existing.addEventListener('error',reject,{once:true});
+          return;
+        }
+
+        const script=document.createElement('script');
+        script.src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js';
+        script.dataset.colectorQr='1';
+        script.onload=resolve;
+        script.onerror=reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    function showQr(){
+      if(!sessionData)return;
+
+      qrTitle.textContent=sessionData.schema.title||sessionData.schema.internalTitle||'Formulář';
+      qrBox.innerHTML='';
+      qrScreen.classList.add('open');
+
+      loadQrLibrary().then(()=>{
+        const size=Math.max(
+          220,
+          Math.min(480,Math.floor(Math.min(window.innerWidth*.72,window.innerHeight*.60)))
+        );
+
+        new QRCode(qrBox,{
+          text:participantUrl(),
+          width:size,
+          height:size,
+          colorDark:'#111827',
+          colorLight:'#ffffff',
+          correctLevel:QRCode.CorrectLevel.M
+        });
+      }).catch(()=>{
+        qrBox.textContent='QR kód se nepodařilo načíst.';
+      });
+    }
+
+    document.getElementById('homeBrand').onclick=goHome;
+    document.getElementById('qrButton').onclick=showQr;
+    document.getElementById('qrClose').onclick=()=>qrScreen.classList.remove('open');
+
+    if(!FORM_ID){
+      contentEl.innerHTML='<div class="empty"><strong>Chybí formulář</strong></div>';
+    }else{
+      loadSession();
+      setInterval(loadSession,3000);
+    }
+  </script>
+</body>
+</html>

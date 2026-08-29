@@ -19,6 +19,7 @@ function doGet(e) {
   const view = params.view || '';
 
   if (view === 'editor') return renderEditor_();
+  if (view === 'session') return renderSession_(params.form || '');
   if (view === 'forms') return renderTemplatePage_('Forms', 'CoLector — Moje formuláře');
   if (view === 'data') return renderTemplatePage_('Data', 'CoLector — Data a výsledky');
   if (view === 'form') return renderParticipant_(params.form || '');
@@ -40,6 +41,16 @@ function renderTemplatePage_(fileName, title) {
   const template = HtmlService.createTemplateFromFile(fileName);
   template.appUrl = ScriptApp.getService().getUrl();
   return template.evaluate().setTitle(title)
+    .setFaviconUrl(APP_ICON_URL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function renderSession_(formId) {
+  const template = HtmlService.createTemplateFromFile('Session');
+  template.formId = formId;
+  template.appUrl = ScriptApp.getService().getUrl();
+  return template.evaluate().setTitle('CoLector — Session')
     .setFaviconUrl(APP_ICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -112,41 +123,56 @@ function getEditorRouteBootstrap_() {
   }
 
   const headerActions=document.querySelector('.header-actions');
+  const qrButton=document.getElementById('qrButton');
+  const publishButton=document.getElementById('publishButton');
+  const bottomBar=document.querySelector('.editor-bottom-bar');
+  let publishedSnapshot=null;
+
+  function schemaComparable(schema){
+    return JSON.stringify(schema||null);
+  }
+
+  function refreshPublishState(){
+    const current=publishedSnapshot&&schemaComparable(buildSchema())===schemaComparable(publishedSnapshot);
+    if(bottomBar){
+      bottomBar.classList.toggle('publish-current',!!current);
+      bottomBar.classList.toggle('publish-pending',!current);
+    }
+    return !!current;
+  }
+
+  if(qrButton){
+    qrButton.disabled=false;
+    qrButton.addEventListener('click',function(){
+      google.script.run.withSuccessHandler(function(result){
+        if(!result||!result.publishedAt){alert('Formulář nejdřív publikuj.');return}
+        showQr();
+      }).withFailureHandler(function(error){alert((error&&error.message)||'QR se nepodařilo otevřít.')}).getFormDraft(state.formId);
+    });
+  }
+
+  if(publishButton){
+    publishButton.disabled=false;
+    publishButton.addEventListener('click',function(){
+      publishButton.disabled=true;
+      const original=publishButton.innerHTML;
+      publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Publikuji…</span>';
+      google.script.run.withSuccessHandler(function(){
+        publishedSnapshot=JSON.parse(JSON.stringify(buildSchema()));
+        refreshPublishState();
+        publishButton.classList.add('publish-ok');
+        publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg></span><span>Publikováno</span>';
+        setTimeout(function(){publishButton.classList.remove('publish-ok');publishButton.innerHTML=original;publishButton.disabled=false},1400);
+      }).withFailureHandler(function(error){publishButton.innerHTML=original;publishButton.disabled=false;alert((error&&error.message)||'Publikování se nepodařilo.')}).publishFormDraft({formId:state.formId,schema:buildSchema()});
+    });
+  }
+
   if(headerActions){
-    const buttons=Array.from(headerActions.querySelectorAll('.header-btn'));
-    const qrButton=buttons.find(function(button){return button.textContent.trim()==='QR'});
-    const publishButton=buttons.find(function(button){return button.textContent.trim()==='Publikovat'});
-
-    if(qrButton){
-      qrButton.disabled=false;
-      qrButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM15 14h2v2h-2zM19 14h2v4h-2zM14 19h4v2h-4zM20 20h1v1h-1z"/></svg><span>QR</span>';
-      qrButton.addEventListener('click',function(){
-        google.script.run.withSuccessHandler(function(result){
-          if(!result||!result.publishedAt){alert('Formulář nejdřív publikuj.');return}
-          showQr();
-        }).withFailureHandler(function(error){alert((error&&error.message)||'QR se nepodařilo otevřít.')}).getFormDraft(state.formId);
-      });
-      headerActions.insertBefore(qrButton,headerActions.firstChild);
-    }
-
-    if(publishButton){
-      publishButton.disabled=false;
-      publishButton.addEventListener('click',function(){
-        publishButton.disabled=true;
-        const original=publishButton.innerHTML;
-        publishButton.innerHTML='<span>Publikuji…</span>';
-        google.script.run.withSuccessHandler(function(){
-          publishButton.classList.add('publish-ok');publishButton.innerHTML='<span>Publikováno</span>';
-          setTimeout(function(){publishButton.classList.remove('publish-ok');publishButton.innerHTML=original;publishButton.disabled=false},1400);
-        }).withFailureHandler(function(error){publishButton.innerHTML=original;publishButton.disabled=false;alert((error&&error.message)||'Publikování se nepodařilo.')}).publishFormDraft({formId:state.formId,schema:buildSchema()});
-      });
-    }
-
     const deleteButton=document.createElement('button');
     deleteButton.className='header-btn delete-form';deleteButton.type='button';deleteButton.title='Smazat formulář';deleteButton.setAttribute('aria-label','Smazat formulář');
     deleteButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg><span>Smazat</span>';
     deleteButton.addEventListener('click',function(){
-      if(!confirm('Opravdu smazat tento formulář?'))return;
+      if(!confirm('Opravdu chceš smazat tento formulář?'))return;
       deleteButton.disabled=true;
       google.script.run.withSuccessHandler(function(){try{localStorage.removeItem(STORAGE_KEY)}catch(e){}goHome()}).withFailureHandler(function(error){deleteButton.disabled=false;alert((error&&error.message)||'Smazání se nepodařilo.')}).deleteFormDraft(state.formId);
     });
@@ -159,7 +185,7 @@ function getEditorRouteBootstrap_() {
     resetButton.className='editor-reset';resetButton.type='button';resetButton.title='Vymazat obsah formuláře';resetButton.setAttribute('aria-label','Vymazat obsah formuláře');
     resetButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6"/><path d="M5.5 9A8 8 0 1 1 6 17.5"/></svg>';
     resetButton.addEventListener('click',function(){
-      if(!confirm('Opravdu vymazat celý obsah formuláře?'))return;
+      if(!confirm('Opravdu chceš vymazat obsah formuláře?'))return;
       applyEditorSchema({version:2,formId:state.formId,internalTitle:state.internalTitle||'Nový formulář',title:'',instructions:'',fields:[]});
     });
     canvas.appendChild(resetButton);
@@ -177,12 +203,15 @@ function getEditorRouteBootstrap_() {
 
   function createBlankSchema(){return{version:2,formId:createId('form'),internalTitle:'Nový formulář',title:'',instructions:'',fields:[{id:createId('field'),type:'textarea',label:'',required:false,height:115,accent:'blue'}]}}
 
+  document.addEventListener('input',function(){setTimeout(refreshPublishState,0)},true);
+  document.addEventListener('change',function(){setTimeout(refreshPublishState,0)},true);
+
   google.script.url.getLocation(function(location){
     const params=(location&&location.parameter)||{};
     if(params.new==='1'){applyEditorSchema(createBlankSchema());return}
     if(params.form){
       setSaveStatus('Načítám…','saving','Načítám formulář');
-      google.script.run.withSuccessHandler(function(result){if(!result||!result.schema){setSaveStatus('Nenalezeno','error','Formulář nebyl nalezen');return}applyEditorSchema(result.schema)}).withFailureHandler(function(error){const message=error&&error.message?error.message:'Formulář se nepodařilo načíst';setSaveStatus('Chyba','error',message)}).getFormDraft(params.form);
+      google.script.run.withSuccessHandler(function(result){if(!result||!result.schema){setSaveStatus('Nenalezeno','error','Formulář nebyl nalezen');return}publishedSnapshot=result.publishedSchema||null;applyEditorSchema(result.schema);refreshPublishState()}).withFailureHandler(function(error){const message=error&&error.message?error.message:'Formulář se nepodařilo načíst';setSaveStatus('Chyba','error',message)}).getFormDraft(params.form);
       return;
     }
     scheduleSave();
@@ -254,9 +283,14 @@ function getFormDraft(formId) {
   const values = sheet.getRange(rowIndex, 1, 1, FORMS_HEADERS.length).getValues()[0];
   let schema = null;
   try {schema = JSON.parse(values[3] || '{}');} catch (error) {throw new Error('Uložený form_schema není validní JSON.');}
+  let publishedSchema=null;
+  if(values[7]){
+    try {publishedSchema=JSON.parse(values[7]);} catch(error){publishedSchema=null;}
+  }
   return {
     formId:values[0],internalTitle:values[1]||'',title:values[2]||'',schema:schema,status:values[4]||'draft',
-    createdAt:toIso_(values[5]),updatedAt:toIso_(values[6]),publishedAt:toIso_(values[8])
+    createdAt:toIso_(values[5]),updatedAt:toIso_(values[6]),publishedAt:toIso_(values[8]),
+    publishedSchema:publishedSchema
   };
 }
 

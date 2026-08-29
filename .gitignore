@@ -22,3 +22,12 @@ apps-script/.clasp.json
 # Temporary files
 *.tmp
 *.log
+
+# Replit local project config
+.replit
+
+# Root clasp project config
+.clasp.json
+
+# Local OAuth/client credentials
+credentials.json

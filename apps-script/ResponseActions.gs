@@ -74,6 +74,89 @@ function submitParticipantResponse(payload) {
   }
 }
 
+function getSessionView(formId) {
+  if (!formId) throw new Error('Chybí form_id.');
+
+  const published = getPublishedForm(formId);
+  if (!published || !published.schema) {
+    throw new Error('Formulář není publikovaný.');
+  }
+
+  const central = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const registry = getOrCreateFormDataRegistry_(central);
+
+  let spreadsheetId = '';
+  let spreadsheetUrl = '';
+
+  if (registry.getLastRow() > 1) {
+    const rows = registry
+      .getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length)
+      .getValues();
+
+    const match = rows.find(row => String(row[0]) === String(formId));
+
+    if (match) {
+      spreadsheetId = String(match[1] || '');
+      spreadsheetUrl = String(match[2] || '');
+    }
+  }
+
+  const teams = [];
+  const answersByTeam = {};
+
+  if (spreadsheetId) {
+    try {
+      const target = SpreadsheetApp.openById(spreadsheetId);
+      const teamSheet = getOrCreateTeamsSheet_(target);
+
+      if (teamSheet.getLastRow() > 1) {
+        teamSheet
+          .getRange(2, 1, teamSheet.getLastRow() - 1, 4)
+          .getValues()
+          .forEach(row => {
+            if (!row[0]) return;
+
+            teams.push({
+              teamId: String(row[0]),
+              teamLabel: String(row[1] || ''),
+              openedAt: row[2] ? new Date(row[2]).toISOString() : '',
+              submittedAt: row[3] ? new Date(row[3]).toISOString() : '',
+              submitted: !!row[3]
+            });
+          });
+      }
+
+      const meta = target.getSheetByName('_META');
+
+      if (meta && meta.getLastRow() > 1) {
+        meta
+          .getRange(2, 1, meta.getLastRow() - 1, 8)
+          .getValues()
+          .forEach(row => {
+            const teamId = String(row[2] || '');
+            if (!teamId || !row[7]) return;
+
+            try {
+              answersByTeam[teamId] = {
+                submittedAt: row[0] ? new Date(row[0]).toISOString() : '',
+                answers: JSON.parse(String(row[7]))
+              };
+            } catch (error) {}
+          });
+      }
+    } catch (error) {}
+  }
+
+  return {
+    formId: formId,
+    schema: published.schema,
+    publishedAt: published.publishedAt || '',
+    teams: teams,
+    answersByTeam: answersByTeam,
+    spreadsheetUrl: spreadsheetUrl
+  };
+}
+
 function getHomeFormSummaries() {
   const forms = listFormDrafts();
   const central = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -106,6 +189,20 @@ function getHomeFormSummaries() {
       dataUrl: data ? data.spreadsheetUrl : ''
     });
   });
+}
+
+function getOrCreateFormDataUrl(formId) {
+  if (!formId) throw new Error('Chybí form_id.');
+
+  const source = getFormDraft(formId);
+  if (!source || !source.schema) throw new Error('Formulář nebyl nalezen.');
+
+  const target = getOrCreateFormDataSpreadsheet_(formId, source.schema);
+  return {
+    ok: true,
+    formId: formId,
+    url: target.getUrl()
+  };
 }
 
 function getOrCreateFormDataSpreadsheet_(formId, schema) {
