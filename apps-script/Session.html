@@ -71,19 +71,15 @@
       min-width:0;
       height:100%;
       display:grid;
+      grid-template-columns:repeat(10,18px);
       grid-template-rows:repeat(4,18px);
-      grid-auto-flow:column;
-      grid-auto-columns:18px;
+      grid-auto-flow:row;
       gap:2px;
       align-content:center;
       justify-content:start;
-      overflow-x:auto;
-      overflow-y:hidden;
+      overflow:hidden;
       padding:2px 1px;
-      scrollbar-width:none;
-      overscroll-behavior-x:contain;
     }
-    .teams::-webkit-scrollbar{display:none}
 
     .team-square{
       width:18px;
@@ -346,7 +342,7 @@
       .section-name{font-size:14px}
       .session-count .submitted-count,.session-count .distributed-count{font-size:18px}
       .session-count .count-sep{font-size:14px}
-      .teams{grid-template-rows:repeat(4,17px);grid-auto-columns:17px;gap:2px;padding:1px 0}
+      .teams{grid-template-columns:repeat(10,17px);grid-template-rows:repeat(4,17px);grid-auto-flow:row;gap:2px;padding:1px 0}
       .team-square{width:17px;height:17px;border-radius:4px;font-size:8.5px}
       main{padding:10px 8px 20px}
       .bottom-dock{border-radius:19px;padding-left:8px;padding-right:8px}
@@ -361,7 +357,7 @@
       .section-name{font-size:13px}
       .session-count .submitted-count,.session-count .distributed-count{font-size:17px}
       .session-count .count-sep{font-size:13px}
-      .teams{grid-template-rows:repeat(4,16px);grid-auto-columns:16px;gap:2px}
+      .teams{grid-template-columns:repeat(10,16px);grid-template-rows:repeat(4,16px);grid-auto-flow:row;gap:2px}
       .team-square{width:16px;height:16px;border-radius:3px;font-size:8px}
     }
 
