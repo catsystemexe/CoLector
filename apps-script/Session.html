@@ -61,42 +61,52 @@
       white-space:nowrap;
       padding:0 2px;
       font-weight:850;
-      letter-spacing:-.02em;
+      letter-spacing:-.025em;
     }
-    .session-count .submitted-count{font-size:21px;color:#23975b}
-    .session-count .count-sep{font-size:16px;color:#9aa4b5;font-weight:700}
-    .session-count .distributed-count{font-size:21px;color:#2671d9}
+    .session-count .submitted-count{font-size:25px;color:#23975b}
+    .session-count .count-sep{font-size:19px;color:#9aa4b5;font-weight:700}
+    .session-count .distributed-count{font-size:25px;color:#2671d9}
 
     .teams{
+      --team-size:18px;
+      --team-rows:1;
       min-width:0;
       height:100%;
       display:grid;
-      grid-template-columns:repeat(10,18px);
-      grid-template-rows:repeat(4,18px);
+      grid-template-columns:repeat(10,var(--team-size));
+      grid-template-rows:repeat(var(--team-rows),var(--team-size));
       grid-auto-flow:row;
       gap:2px;
       align-content:center;
       justify-content:start;
       overflow:hidden;
       padding:2px 1px;
+      margin-left:8px;
     }
 
     .team-square{
-      width:18px;
-      height:18px;
+      width:var(--team-size);
+      height:var(--team-size);
       border-radius:4px;
       display:grid;
       place-items:center;
-      color:#fff;
-      background:#3c89e8;
       font-size:9px;
       line-height:1;
       font-weight:850;
       user-select:none;
       cursor:default;
+      box-sizing:border-box;
     }
-    .team-square.submitted{background:#36ae6a}
-    .team-square.working{background:#3c89e8}
+    .team-square.submitted{
+      background:#36ae6a;
+      border:1px solid #36ae6a;
+      color:#fff;
+    }
+    .team-square.working{
+      background:#fff;
+      border:1.5px solid #3c89e8;
+      color:#2671d9;
+    }
 
     /* CONTENT */
     main{
@@ -340,10 +350,10 @@
       .session-header{padding:5px 7px;gap:7px}
       .brand-mark{width:42px;height:42px}
       .section-name{font-size:14px}
-      .session-count .submitted-count,.session-count .distributed-count{font-size:18px}
-      .session-count .count-sep{font-size:14px}
-      .teams{grid-template-columns:repeat(10,17px);grid-template-rows:repeat(4,17px);grid-auto-flow:row;gap:2px;padding:1px 0}
-      .team-square{width:17px;height:17px;border-radius:4px;font-size:8.5px}
+      .session-count .submitted-count,.session-count .distributed-count{font-size:22px}
+      .session-count .count-sep{font-size:16px}
+      .teams{--team-size:17px;gap:2px;padding:1px 0;margin-left:9px}
+      .team-square{border-radius:4px;font-size:8.5px}
       main{padding:10px 8px 20px}
       .bottom-dock{border-radius:19px;padding-left:8px;padding-right:8px}
       .dock-action{min-height:62px;font-size:12px}
@@ -355,10 +365,10 @@
       .brand{gap:4px}
       .brand-mark{width:39px;height:39px}
       .section-name{font-size:13px}
-      .session-count .submitted-count,.session-count .distributed-count{font-size:17px}
-      .session-count .count-sep{font-size:13px}
-      .teams{grid-template-columns:repeat(10,16px);grid-template-rows:repeat(4,16px);grid-auto-flow:row;gap:2px}
-      .team-square{width:16px;height:16px;border-radius:3px;font-size:8px}
+      .session-count .submitted-count,.session-count .distributed-count{font-size:21px}
+      .session-count .count-sep{font-size:15px}
+      .teams{--team-size:16px;gap:2px;margin-left:8px}
+      .team-square{border-radius:3px;font-size:8px}
     }
 
     @media(prefers-reduced-motion:reduce){
@@ -500,6 +510,8 @@
 
       submittedCountEl.textContent=String(submitted);
       distributedCountEl.textContent=String(teams.length);
+      const rowsUsed=Math.max(1,Math.min(4,Math.ceil(teams.length/10)));
+      teamsEl.style.setProperty('--team-rows',String(rowsUsed));
 
       teams.forEach((team,index)=>{
         const square=document.createElement('span');
