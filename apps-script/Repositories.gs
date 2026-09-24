@@ -184,6 +184,21 @@ function formRepositoryPublish_(payload, central) {
   return { ok: true, formId: payload.formId, publishedAt: now.toISOString() };
 }
 
+function formRepositoryIsDistributed_(formId, central) {
+  if (!formId) return false;
+  const spreadsheet = central || openCentralStore_();
+
+  const runtime = formRuntimeRepositoryGet_(formId, spreadsheet);
+  if (runtime && Number(runtime.totalParticipants || 0) > 0) return true;
+
+  const record = getFormDataRecord_(formId, spreadsheet);
+  if (!record || !record.spreadsheetId) return false;
+
+  const target = SpreadsheetApp.openById(record.spreadsheetId);
+  const teams = getTeamsStore_(target);
+  return !!(teams && teams.getLastRow() > 1);
+}
+
 // ---------- TEMPLATES repository ----------
 
 function getTemplatesStore_(central) {
