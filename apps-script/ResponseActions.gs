@@ -2,6 +2,8 @@ const FORM_DATA_REGISTRY_SHEET = 'FORM_DATA';
 const FORM_DATA_REGISTRY_HEADERS = ['form_id', 'spreadsheet_id', 'spreadsheet_url', 'created_at'];
 const FORM_TEAMS_SHEET = '_TEAMS';
 const FORM_TEAMS_HEADERS = ['team_id', 'team_label', 'opened_at', 'submitted_at'];
+const FORM_META_HEADERS = ['timestamp', 'form_id', 'team_id', 'team_label', 'response_id', 'source', 'published_at', 'answers_json', 'round_id'];
+const ROUND_STATE_PREFIX = 'colector.rounds.';
 
 function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
@@ -13,45 +15,45 @@ function registerParticipantOpen(payload) {
   try {
     const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema);
     const teams = getOrCreateTeamsSheet_(target);
-    const existing = findTeamRow_(teams, payload.teamId);
-    if (existing) return {ok:true,teamLabel:String(existing.values[1] || '')};
-
-    const teamLabel = nextTeamLabelFromTeams_(teams);
-    teams.appendRow([payload.teamId, teamLabel, new Date(), '']);
-    return {ok:true,teamLabel:teamLabel};
+    const team = ensureParticipantTeam_(teams, payload.teamId);
+    return {ok:true,teamLabel:String(team.values[1] || '')};
   } finally {
     lock.releaseLock();
   }
 }
 
 function submitParticipantResponse(payload) {
-  if (!payload || !payload.formId || !payload.teamId || !payload.responseId || !payload.answers) {
+  if (!payload || !payload.formId || !payload.teamId || !payload.responseId || !payload.answers || !payload.roundId) {
     throw new Error('Neplatná odpověď formuláře.');
   }
 
   const published = getPublishedForm(payload.formId);
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
+  const rounds = schemaRounds_(published.schema);
+  if (!rounds.length) throw new Error('Formulář nemá žádný Round.');
 
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema);
     const responses = target.getSheetByName('ODPOVĚDI');
-    const meta = target.getSheetByName('_META');
+    const meta = ensureMetaHeaders_(target);
     const teams = getOrCreateTeamsSheet_(target);
+    const team = ensureParticipantTeam_(teams, payload.teamId);
+    const teamLabel = String(team.values[1] || '');
 
     if (hasResponseId_(meta, payload.responseId)) {
-      const duplicateTeam = findTeamRow_(teams, payload.teamId);
-      return { ok: true, duplicate: true, teamLabel: duplicateTeam ? String(duplicateTeam.values[1] || '') : '' };
+      return {ok:true,duplicate:true,teamLabel:teamLabel};
     }
 
-    let team = findTeamRow_(teams, payload.teamId);
-    if (!team) {
-      const label = nextTeamLabelFromTeams_(teams);
-      teams.appendRow([payload.teamId, label, new Date(), '']);
-      team = findTeamRow_(teams, payload.teamId);
-    }
-    const teamLabel = String(team.values[1] || '');
+    const completed = completedRoundIdsForTeam_(target, payload.teamId, rounds);
+    const nextRound = rounds.find(round => !completed.includes(round.id));
+    if (!nextRound) return {ok:true,duplicate:false,teamLabel:teamLabel,complete:true};
+    if (String(nextRound.id) !== String(payload.roundId)) throw new Error('Tento Round teď není aktivní.');
+
+    const roundStates = getRoundStates_(payload.formId, published.schema);
+    const currentState = roundStates.find(round => String(round.roundId) === String(nextRound.id));
+    if (!currentState || !currentState.unlocked) throw new Error('Tento Round je momentálně uzamčený.');
 
     ensureResponseHeaders_(responses, published.schema);
     upsertTeamResponse_(responses, teamLabel, published.schema, payload.answers);
@@ -64,37 +66,181 @@ function submitParticipantResponse(payload) {
       payload.responseId,
       'online',
       published.publishedAt || '',
-      JSON.stringify(payload.answers)
+      JSON.stringify(payload.answers),
+      nextRound.id
     ]);
 
-    teams.getRange(team.rowIndex, 4).setValue(new Date());
-    return { ok: true, duplicate: false, teamLabel: teamLabel };
+    const completedAfter = completed.concat(nextRound.id);
+    const complete = rounds.every(round => completedAfter.includes(round.id));
+    if (complete) teams.getRange(team.rowIndex, 4).setValue(new Date());
+
+    return {
+      ok:true,
+      duplicate:false,
+      teamLabel:teamLabel,
+      roundId:nextRound.id,
+      roundNumber:nextRound.number,
+      complete:complete
+    };
   } finally {
     lock.releaseLock();
   }
+}
+
+function getParticipantRoundView(payload) {
+  if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
+  const published = getPublishedForm(payload.formId);
+  if (!published || !published.schema) return {status:'unavailable'};
+
+  const rounds = schemaRounds_(published.schema);
+  if (!rounds.length) return {status:'unavailable'};
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema);
+    const teams = getOrCreateTeamsSheet_(target);
+    const team = ensureParticipantTeam_(teams, payload.teamId);
+    const teamLabel = String(team.values[1] || '');
+    const completed = completedRoundIdsForTeam_(target, payload.teamId, rounds);
+    const nextRound = rounds.find(round => !completed.includes(round.id));
+
+    if (!nextRound) {
+      return {status:'complete',teamLabel:teamLabel,completedRoundIds:completed,roundCount:rounds.length};
+    }
+
+    const states = getRoundStates_(payload.formId, published.schema);
+    const state = states.find(item => item.roundId === nextRound.id);
+    if (!state || !state.unlocked) {
+      return {
+        status:'locked',
+        teamLabel:teamLabel,
+        roundId:nextRound.id,
+        roundNumber:nextRound.number,
+        roundCount:rounds.length,
+        completedRoundIds:completed
+      };
+    }
+
+    return {
+      status:'ready',
+      teamLabel:teamLabel,
+      roundId:nextRound.id,
+      roundNumber:nextRound.number,
+      roundCount:rounds.length,
+      completedRoundIds:completed,
+      schema:{
+        version:3,
+        formId:payload.formId,
+        roundId:nextRound.id,
+        roundNumber:nextRound.number,
+        title:nextRound.title || '',
+        instructions:nextRound.instructions || '',
+        fields:nextRound.fields || []
+      }
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setRoundLock(payload) {
+  if (!payload || !payload.formId || !payload.roundId || typeof payload.unlocked !== 'boolean') {
+    throw new Error('Neplatná změna Roundu.');
+  }
+  const published = getPublishedForm(payload.formId);
+  if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
+
+  const rounds = schemaRounds_(published.schema);
+  if (!rounds.some(round => String(round.id) === String(payload.roundId))) throw new Error('Round nebyl nalezen.');
+
+  const properties = PropertiesService.getScriptProperties();
+  const key = ROUND_STATE_PREFIX + payload.formId;
+  let values = {};
+  try { values = JSON.parse(properties.getProperty(key) || '{}'); } catch (error) { values = {}; }
+  values[String(payload.roundId)] = payload.unlocked;
+  properties.setProperty(key, JSON.stringify(values));
+
+  return {ok:true,rounds:getRoundStates_(payload.formId, published.schema)};
+}
+
+function schemaRounds_(schema) {
+  if (!schema) return [];
+  const source = Array.isArray(schema.rounds) && schema.rounds.length
+    ? schema.rounds
+    : [{id:'round_1',title:schema.title || '',instructions:schema.instructions || '',fields:Array.isArray(schema.fields) ? schema.fields : []}];
+
+  return source.map((round,index) => ({
+    id:String(round.id || ('round_' + (index + 1))),
+    number:index + 1,
+    title:String(round.title || ''),
+    instructions:String(round.instructions || ''),
+    fields:Array.isArray(round.fields) ? round.fields : []
+  }));
+}
+
+function getRoundStates_(formId, schema) {
+  const rounds = schemaRounds_(schema);
+  const properties = PropertiesService.getScriptProperties();
+  const key = ROUND_STATE_PREFIX + formId;
+  let stored = {};
+  try { stored = JSON.parse(properties.getProperty(key) || '{}'); } catch (error) { stored = {}; }
+
+  return rounds.map((round,index) => ({
+    roundId:round.id,
+    number:index + 1,
+    unlocked:typeof stored[round.id] === 'boolean' ? stored[round.id] : index === 0
+  }));
+}
+
+function ensureParticipantTeam_(teams, teamId) {
+  let team = findTeamRow_(teams, teamId);
+  if (team) return team;
+  const label = nextTeamLabelFromTeams_(teams);
+  teams.appendRow([teamId, label, new Date(), '']);
+  return findTeamRow_(teams, teamId);
+}
+
+function ensureMetaHeaders_(spreadsheet) {
+  let meta = spreadsheet.getSheetByName('_META');
+  if (!meta) meta = spreadsheet.insertSheet('_META');
+  if (meta.getMaxColumns() < FORM_META_HEADERS.length) {
+    meta.insertColumnsAfter(meta.getMaxColumns(), FORM_META_HEADERS.length - meta.getMaxColumns());
+  }
+  meta.getRange(1, 1, 1, FORM_META_HEADERS.length).setValues([FORM_META_HEADERS]);
+  meta.setFrozenRows(1);
+  return meta;
+}
+
+function completedRoundIdsForTeam_(spreadsheet, teamId, rounds) {
+  const meta = ensureMetaHeaders_(spreadsheet);
+  if (meta.getLastRow() < 2) return [];
+  const firstRoundId = rounds[0] ? rounds[0].id : '';
+  const completed = [];
+  meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
+    if (String(row[2] || '') !== String(teamId)) return;
+    const roundId = String(row[8] || firstRoundId);
+    if (roundId && !completed.includes(roundId)) completed.push(roundId);
+  });
+  return completed;
 }
 
 function getSessionView(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
   const published = getPublishedForm(formId);
-  if (!published || !published.schema) {
-    throw new Error('Formulář není publikovaný.');
-  }
+  if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
+  const rounds = schemaRounds_(published.schema);
+  const roundStates = getRoundStates_(formId, published.schema);
   const central = SpreadsheetApp.openById(SPREADSHEET_ID);
   const registry = getOrCreateFormDataRegistry_(central);
 
   let spreadsheetId = '';
   let spreadsheetUrl = '';
-
   if (registry.getLastRow() > 1) {
-    const rows = registry
-      .getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length)
-      .getValues();
-
+    const rows = registry.getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues();
     const match = rows.find(row => String(row[0]) === String(formId));
-
     if (match) {
       spreadsheetId = String(match[1] || '');
       spreadsheetUrl = String(match[2] || '');
@@ -102,58 +248,77 @@ function getSessionView(formId) {
   }
 
   const teams = [];
-  const answersByTeam = {};
-
+  const answersByTeamRound = {};
   if (spreadsheetId) {
     try {
       const target = SpreadsheetApp.openById(spreadsheetId);
       const teamSheet = getOrCreateTeamsSheet_(target);
+      const completedByTeam = {};
 
       if (teamSheet.getLastRow() > 1) {
-        teamSheet
-          .getRange(2, 1, teamSheet.getLastRow() - 1, 4)
-          .getValues()
-          .forEach(row => {
-            if (!row[0]) return;
-
-            teams.push({
-              teamId: String(row[0]),
-              teamLabel: String(row[1] || ''),
-              openedAt: row[2] ? new Date(row[2]).toISOString() : '',
-              submittedAt: row[3] ? new Date(row[3]).toISOString() : '',
-              submitted: !!row[3]
-            });
+        teamSheet.getRange(2, 1, teamSheet.getLastRow() - 1, 4).getValues().forEach(row => {
+          if (!row[0]) return;
+          const teamId = String(row[0]);
+          completedByTeam[teamId] = [];
+          teams.push({
+            teamId:teamId,
+            teamLabel:String(row[1] || ''),
+            openedAt:row[2] ? new Date(row[2]).toISOString() : '',
+            submittedAt:row[3] ? new Date(row[3]).toISOString() : '',
+            submitted:!!row[3],
+            completedRoundIds:[]
           });
+        });
       }
 
-      const meta = target.getSheetByName('_META');
-
-      if (meta && meta.getLastRow() > 1) {
-        meta
-          .getRange(2, 1, meta.getLastRow() - 1, 8)
-          .getValues()
-          .forEach(row => {
-            const teamId = String(row[2] || '');
-            if (!teamId || !row[7]) return;
-
-            try {
-              answersByTeam[teamId] = {
-                submittedAt: row[0] ? new Date(row[0]).toISOString() : '',
-                answers: JSON.parse(String(row[7]))
-              };
-            } catch (error) {}
-          });
+      const meta = ensureMetaHeaders_(target);
+      if (meta.getLastRow() > 1) {
+        meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
+          const teamId = String(row[2] || '');
+          if (!teamId || !row[7]) return;
+          const roundId = String(row[8] || (rounds[0] && rounds[0].id) || '');
+          if (!roundId) return;
+          if (!completedByTeam[teamId]) completedByTeam[teamId] = [];
+          if (!completedByTeam[teamId].includes(roundId)) completedByTeam[teamId].push(roundId);
+          if (!answersByTeamRound[teamId]) answersByTeamRound[teamId] = {};
+          try {
+            answersByTeamRound[teamId][roundId] = {
+              submittedAt:row[0] ? new Date(row[0]).toISOString() : '',
+              answers:JSON.parse(String(row[7]))
+            };
+          } catch (error) {}
+        });
       }
+
+      teams.forEach(team => {
+        team.completedRoundIds = completedByTeam[team.teamId] || [];
+        team.submitted = rounds.length > 0 && rounds.every(round => team.completedRoundIds.includes(round.id));
+      });
     } catch (error) {}
   }
 
+  const roundViews = rounds.map((round,index) => {
+    const lockState = roundStates.find(item => item.roundId === round.id);
+    return {
+      roundId:round.id,
+      number:index + 1,
+      title:round.title || '',
+      instructions:round.instructions || '',
+      fields:round.fields || [],
+      unlocked:!!(lockState && lockState.unlocked),
+      submittedCount:teams.filter(team => (team.completedRoundIds || []).includes(round.id)).length,
+      distributedCount:teams.length
+    };
+  });
+
   return {
-    formId: formId,
-    schema: published.schema,
-    publishedAt: published.publishedAt || '',
-    teams: teams,
-    answersByTeam: answersByTeam,
-    spreadsheetUrl: spreadsheetUrl
+    formId:formId,
+    schema:published.schema,
+    publishedAt:published.publishedAt || '',
+    rounds:roundViews,
+    teams:teams,
+    answersByTeamRound:answersByTeamRound,
+    spreadsheetUrl:spreadsheetUrl
   };
 }
 
@@ -172,6 +337,12 @@ function getHomeFormSummaries() {
     const data = dataByForm[form.formId] || null;
     let distributed = 0;
     let collected = 0;
+    let published = null;
+    try { published = getPublishedForm(form.formId); } catch (error) {}
+
+    const rounds = published && published.schema ? schemaRounds_(published.schema) : [];
+    const completedByTeam = {};
+
     if (data && data.spreadsheetId) {
       try {
         const target = SpreadsheetApp.openById(data.spreadsheetId);
@@ -179,14 +350,39 @@ function getHomeFormSummaries() {
         if (teams.getLastRow() > 1) {
           const rows = teams.getRange(2, 1, teams.getLastRow() - 1, 4).getValues();
           distributed = rows.filter(row => row[0]).length;
-          collected = rows.filter(row => row[0] && row[3]).length;
+          rows.forEach(row => { if (row[0]) completedByTeam[String(row[0])] = []; });
+        }
+
+        if (rounds.length) {
+          const meta = ensureMetaHeaders_(target);
+          if (meta.getLastRow() > 1) {
+            meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
+              const teamId = String(row[2] || '');
+              if (!teamId) return;
+              const roundId = String(row[8] || rounds[0].id);
+              if (!completedByTeam[teamId]) completedByTeam[teamId] = [];
+              if (!completedByTeam[teamId].includes(roundId)) completedByTeam[teamId].push(roundId);
+            });
+          }
+          collected = Object.keys(completedByTeam).filter(teamId => rounds.every(round => completedByTeam[teamId].includes(round.id))).length;
         }
       } catch (error) {}
     }
+
+    const roundStates = published && published.schema ? getRoundStates_(form.formId, published.schema) : [];
+    const roundSummary = rounds.map((round,index) => ({
+      roundId:round.id,
+      number:index + 1,
+      unlocked:!!((roundStates.find(item => item.roundId === round.id) || {}).unlocked),
+      submittedCount:Object.keys(completedByTeam).filter(teamId => (completedByTeam[teamId] || []).includes(round.id)).length,
+      distributedCount:distributed
+    }));
+
     return Object.assign({}, form, {
-      distributedCount: distributed,
-      collectedCount: collected,
-      dataUrl: data ? data.spreadsheetUrl : ''
+      distributedCount:distributed,
+      collectedCount:collected,
+      dataUrl:data ? data.spreadsheetUrl : '',
+      rounds:roundSummary
     });
   });
 }
@@ -216,6 +412,8 @@ function getOrCreateFormDataSpreadsheet_(formId, schema) {
       try {
         const existing = SpreadsheetApp.openById(match[1]);
         getOrCreateTeamsSheet_(existing);
+        ensureMetaHeaders_(existing);
+        ensureResponseHeaders_(existing.getSheetByName('ODPOVĚDI'), schema);
         return existing;
       } catch (error) {}
     }
@@ -223,18 +421,16 @@ function getOrCreateFormDataSpreadsheet_(formId, schema) {
 
   const title = String(schema.internalTitle || schema.title || 'Formulář').trim() || 'Formulář';
   const spreadsheet = SpreadsheetApp.create('CoLector — ' + title);
-
   const first = spreadsheet.getSheets()[0];
   first.setName('ODPOVĚDI');
   first.clear();
+
   const meta = spreadsheet.insertSheet('_META');
-  meta.getRange(1, 1, 1, 8).setValues([[
-    'timestamp', 'form_id', 'team_id', 'team_label', 'response_id', 'source', 'published_at', 'answers_json'
-  ]]);
+  meta.getRange(1, 1, 1, FORM_META_HEADERS.length).setValues([FORM_META_HEADERS]);
   meta.setFrozenRows(1);
+
   getOrCreateTeamsSheet_(spreadsheet);
   ensureResponseHeaders_(first, schema);
-
   registry.appendRow([formId, spreadsheet.getId(), spreadsheet.getUrl(), new Date()]);
   return spreadsheet;
 }
@@ -248,7 +444,7 @@ function getOrCreateTeamsSheet_(spreadsheet) {
 
     const meta = spreadsheet.getSheetByName('_META');
     if (meta && meta.getLastRow() > 1) {
-      const rows = meta.getRange(2, 1, meta.getLastRow() - 1, 8).getValues();
+      const rows = meta.getRange(2, 1, meta.getLastRow() - 1, Math.min(FORM_META_HEADERS.length, meta.getLastColumn())).getValues();
       const seen = {};
       rows.forEach(row => {
         const teamId = String(row[2] || '');
@@ -290,31 +486,46 @@ function getOrCreateFormDataRegistry_(spreadsheet) {
 }
 
 function participantFields_(schema) {
-  return (schema.fields || []).filter(field => ['textarea', 'checkbox', 'yes_no'].includes(field.type));
+  const rounds = schemaRounds_(schema);
+  const multi = rounds.length > 1;
+  const fields = [];
+  rounds.forEach((round, roundIndex) => {
+    (round.fields || []).filter(field => ['textarea', 'checkbox', 'yes_no'].includes(field.type)).forEach((field, fieldIndex) => {
+      const copy = Object.assign({}, field);
+      copy._roundId = round.id;
+      copy._roundNumber = roundIndex + 1;
+      copy._columnLabel = (multi ? ('R' + (roundIndex + 1) + ' · ') : '') + String(field.label || ('Položka ' + (fieldIndex + 1)));
+      fields.push(copy);
+    });
+  });
+  return fields;
 }
 
 function ensureResponseHeaders_(sheet, schema) {
+  if (!sheet) return;
   const fields = participantFields_(schema);
-  const headers = ['Tým'].concat(fields.map((field, index) => String(field.label || ('Položka ' + (index + 1)))));
+  const headers = ['Tým'].concat(fields.map(field => field._columnLabel));
   const width = Math.max(1, headers.length);
-  const currentWidth = Math.max(sheet.getLastColumn(), width);
-  if (sheet.getLastRow() < 1 || sheet.getRange(1, 1).getValue() !== 'Tým' || currentWidth !== width) {
-    sheet.getRange(1, 1, 1, width).setValues([headers]);
-    sheet.setFrozenRows(1);
-  } else {
-    sheet.getRange(1, 1, 1, width).setValues([headers]);
-  }
+  if (sheet.getMaxColumns() < width) sheet.insertColumnsAfter(sheet.getMaxColumns(), width - sheet.getMaxColumns());
+  sheet.getRange(1, 1, 1, width).setValues([headers]);
+  sheet.setFrozenRows(1);
 }
 
 function upsertTeamResponse_(sheet, teamLabel, schema, answers) {
   const fields = participantFields_(schema);
-  const row = [teamLabel].concat(fields.map(field => normalizeAnswerForSheet_(field, answers[field.id])));
   let rowIndex = 0;
   if (sheet.getLastRow() > 1) {
     const labels = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().flat();
     const index = labels.indexOf(teamLabel);
     if (index !== -1) rowIndex = index + 2;
   }
+
+  const existing = rowIndex ? sheet.getRange(rowIndex, 1, 1, fields.length + 1).getValues()[0] : [];
+  const row = [teamLabel].concat(fields.map((field,index) => {
+    if (Object.prototype.hasOwnProperty.call(answers, field.id)) return normalizeAnswerForSheet_(field, answers[field.id]);
+    return existing[index + 1] == null ? '' : existing[index + 1];
+  }));
+
   if (rowIndex) sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   else sheet.appendRow(row);
 }
