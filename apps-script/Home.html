@@ -129,7 +129,7 @@
         const letter=partLetter(part.number);
         const button=document.createElement('button');button.type='button';button.className='part-chip'+(part.unlocked?' open':'');
         const selected=Number(part.submittedCount)||0,distributed=Number(part.distributedCount)||0;
-        button.title=(form.publishedAt?(part.unlocked?'Zamknout':'Odemknout'):'Part')+' Part '+letter;
+        button.title=form.publishedAt?((part.unlocked?'Zamknout':'Odemknout')+' Part '+letter):('Part '+letter);
         button.setAttribute('aria-label',button.title+'; '+selected+' vybráno z '+distributed+' rozdaných');
         button.innerHTML='<span class="part-letter">'+letter+'</span><span class="part-stats"><span class="selected">'+selected+'</span><span class="sep">/</span><span class="distributed">'+distributed+'</span></span><span class="part-lock-overlay">'+lockSvg(part.unlocked)+'</span>';
         if(!form.publishedAt){button.disabled=true}
@@ -180,9 +180,7 @@
         const main=document.createElement('div');main.className='form-main';
         main.innerHTML='<div class="form-title"></div><div class="form-meta"><span>'+fmt(form.updatedAt||form.createdAt)+'</span></div>';
         main.querySelector('.form-title').textContent=form.internalTitle||form.title||'Bez názvu';
-        if(total>0){
-          const totalEl=document.createElement('span');totalEl.className='total-participants';totalEl.textContent='Celkem '+total;main.querySelector('.form-meta').append(totalEl);
-        }
+        const totalEl=document.createElement('span');totalEl.className='total-participants';totalEl.textContent='Celkem '+total;main.querySelector('.form-meta').append(totalEl);
         if(!isDistributed){const watermark=document.createElement('span');watermark.className='form-edit-watermark';watermark.innerHTML=pencilSvg;main.append(watermark)}
         card.append(main);
 
