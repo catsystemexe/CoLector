@@ -67,7 +67,7 @@
     .session-count .submitted-count{font-size:25px;color:#23975b}
     .session-count .count-sep{font-size:19px;color:#9aa4b5;font-weight:700}
     .session-count .distributed-count{font-size:25px;color:#2671d9}
-    .round-controls{min-width:0;display:flex;align-items:center;gap:6px;overflow-x:auto;padding:2px 0 2px 4px;scrollbar-width:none}
+    .round-controls{min-width:0;display:flex;align-items:center;justify-content:flex-end;justify-self:end;gap:6px;overflow-x:auto;padding:2px 0 2px 10px;scrollbar-width:none}
     .round-controls::-webkit-scrollbar{display:none}
     .round-lock{flex:0 0 auto;height:38px;min-width:48px;padding:0 9px;border:1px solid #dfe5ee;border-radius:12px;background:#f7f8fb;color:#7b8699;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-weight:900;cursor:pointer}
     .round-lock svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -113,10 +113,10 @@
     .response-view{display:grid}
 .response-view .sheet{touch-action:pan-y}
 .response-view .sheet.swiping{user-select:none}
-.response-browser{display:grid;grid-template-columns:34px minmax(44px,auto) 34px;align-items:center;gap:4px;white-space:nowrap}
-.response-nav{width:34px;height:34px;border:1px solid #dfe5ee;border-radius:10px;background:#fff;color:#59647a;font-size:23px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
+.response-browser{display:grid;grid-template-columns:42px minmax(58px,auto) 42px;align-items:center;gap:6px;white-space:nowrap}
+.response-nav{width:42px;height:40px;border:1px solid #dfe5ee;border-radius:11px;background:#fff;color:#59647a;font-size:28px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
 .response-nav:disabled{opacity:.3;cursor:default}
-.response-position{text-align:center;color:#69758a;font-size:13px;font-weight:850;white-space:nowrap}
+.response-position{text-align:center;color:#4f5c72;font-size:16px;font-weight:900;white-space:nowrap}
 .sheet-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
     .sheet-title{margin:0;font-size:26px;line-height:1.12;color:#27334a}
     .sheet-team{margin-top:6px;color:#279263;font-weight:750;font-size:14px}
@@ -326,9 +326,9 @@
       .section-name{font-size:13px}
       .session-count .submitted-count,.session-count .distributed-count{font-size:21px}
       .session-count .count-sep{font-size:15px}
-      .response-browser{grid-template-columns:30px minmax(38px,auto) 30px;gap:2px}
-      .response-nav{width:30px;height:30px;border-radius:9px;font-size:21px}
-      .response-position{font-size:12px}
+      .response-browser{grid-template-columns:36px minmax(50px,auto) 36px;gap:3px}
+      .response-nav{width:36px;height:35px;border-radius:9px;font-size:24px}
+      .response-position{font-size:14px}
       .round-lock{height:34px;min-width:42px;padding:0 7px}
       main{padding:10px 8px 20px}
       .bottom-dock{border-radius:19px;padding-left:8px;padding-right:8px}
@@ -343,9 +343,9 @@
       .section-name{font-size:12px}
       .session-count .submitted-count,.session-count .distributed-count{font-size:19px}
       .session-count .count-sep{font-size:14px}
-      .response-browser{grid-template-columns:27px minmax(34px,auto) 27px}
-      .response-nav{width:27px;height:28px;font-size:19px}
-      .response-position{font-size:11px}
+      .response-browser{grid-template-columns:32px minmax(44px,auto) 32px}
+      .response-nav{width:32px;height:32px;font-size:22px}
+      .response-position{font-size:13px}
       .round-lock{height:31px;min-width:38px;padding:0 6px}
       .round-lock svg{width:15px;height:15px}
     }
@@ -395,7 +395,7 @@
       <button id="nextResponse" class="response-nav" type="button" aria-label="Další participant" title="Další participant" disabled>›</button>
     </div>
 
-    <div id="roundControls" class="round-controls" aria-label="Roundy"></div>
+    <div id="roundControls" class="round-controls" aria-label="Parts"></div>
 
   </header>
 
@@ -505,9 +505,10 @@
         const button=document.createElement('button');
         button.type='button';
         button.className='round-lock'+(round.unlocked?' open':'')+(round.roundId===focusedRoundId?' focused':'');
-        button.title=(round.unlocked?'Zamknout':'Odemknout')+' Round '+round.number;
+        const partLabel=String.fromCharCode(64+Math.max(1,Number(round.number)||1));
+        button.title=(round.unlocked?'Zamknout':'Odemknout')+' Part '+partLabel;
         button.setAttribute('aria-label',button.title);
-        button.innerHTML=lockSvg(round.unlocked)+'<span>'+round.number+'</span>';
+        button.innerHTML=lockSvg(round.unlocked)+'<span>'+partLabel+'</span>';
         button.onclick=()=>{
           const changedRound=focusedRoundId!==round.roundId;
           focusedRoundId=round.roundId;
@@ -608,7 +609,8 @@
       renderResponseBrowser();
 
       if(!team||!response){
-        contentEl.innerHTML='<div class="empty"><strong>Round '+round.number+' čeká na odevzdání</strong>'+(round.unlocked?'Participantům je Round otevřený.':'Round je momentálně zamčený.')+'</div>';
+        const partLabel='Part '+String.fromCharCode(64+Math.max(1,Number(round.number)||1));
+        contentEl.innerHTML='<div class="empty"><strong>'+partLabel+' čeká na odevzdání</strong>'+(round.unlocked?'Participantům je tato část otevřená.':'Tato část je momentálně zamčená.')+'</div>';
         return;
       }
 
@@ -617,7 +619,7 @@
       const sheet=document.createElement('section');sheet.className='sheet';
       const head=document.createElement('div');head.className='sheet-head';
       const title=document.createElement('h1');title.className='sheet-title';title.textContent=round.title||(sessionData.schema&&sessionData.schema.internalTitle)||team.teamLabel;
-      const teamInfo=document.createElement('div');teamInfo.className='sheet-team';teamInfo.textContent=team.teamLabel+' — Round '+round.number+' odevzdán';
+      const teamInfo=document.createElement('div');teamInfo.className='sheet-team';teamInfo.textContent=team.teamLabel+' — Part '+String.fromCharCode(64+Math.max(1,Number(round.number)||1))+' odevzdán';
       head.append(title,teamInfo);
       if(round.instructions){const instructions=document.createElement('p');instructions.className='instructions';instructions.textContent=round.instructions;head.appendChild(instructions)}
       sheet.appendChild(head);
