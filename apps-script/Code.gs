@@ -221,6 +221,7 @@ function getEditorRouteBootstrap_() {
 }
 
 function saveFormDraft(payload) {
+  const perf = perfStart_('saveFormDraft');
   if (!payload || !payload.formId || !payload.schema) throw new Error('Neplatný draft formuláře.');
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -228,10 +229,12 @@ function saveFormDraft(payload) {
     return formRepositorySaveDraft_(payload, openCentralStore_());
   } finally {
     lock.releaseLock();
+    perfEnd_(perf, {formId:payload.formId});
   }
 }
 
 function publishFormDraft(payload) {
+  const perf = perfStart_('publishFormDraft');
   if (!payload || !payload.formId || !payload.schema) throw new Error('Neplatný formulář k publikování.');
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -241,6 +244,7 @@ function publishFormDraft(payload) {
     return result;
   } finally {
     lock.releaseLock();
+    perfEnd_(perf, {formId:payload.formId});
   }
 }
 
