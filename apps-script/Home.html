@@ -169,7 +169,10 @@
         const shell=document.createElement('div');shell.className='swipe-shell';shell.dataset.open='0';
         const actions=document.createElement('div');actions.className='swipe-actions';
         const dup=hiddenAction('Duplikovat','<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>','duplicate',()=>google.script.run.withSuccessHandler(r=>r&&r.formId?go('?view=editor&form='+encodeURIComponent(r.formId)):load()).duplicateFormDraft(form.formId));
-        const del=hiddenAction('Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>','delete',()=>{if(confirm('Smazat tento formulář?'))google.script.run.withSuccessHandler(load).deleteFormDraft(form.formId)});
+        const del=hiddenAction(isDistributed?'Rozdaný formulář nelze smazat':'Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>','delete',()=>{
+          if(isDistributed){alert('Rozdaný formulář nelze smazat během práce se Session.');return}
+          if(confirm('Smazat tento formulář?'))google.script.run.withSuccessHandler(load).withFailureHandler(error=>alert((error&&error.message)||'Formulář se nepodařilo smazat.')).deleteFormDraft(form.formId)
+        });
         actions.append(dup,del);
 
         const card=document.createElement('div');card.className='form-card';card.setAttribute('role','button');card.tabIndex=0;card.style.setProperty('--part-space',partSpace+'px');
