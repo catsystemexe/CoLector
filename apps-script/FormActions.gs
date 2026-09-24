@@ -1,11 +1,11 @@
 function deleteFormDraft(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateFormsSheet_(spreadsheet);
+  const sheet = getFormsStore_(openCentralStore_());
+  if (!sheet) return { ok: true, deleted: false };
+
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-
   try {
     const rowIndex = findFormRow_(sheet, formId);
     if (!rowIndex) return { ok: true, deleted: false };
@@ -19,7 +19,8 @@ function deleteFormDraft(formId) {
 function duplicateFormDraft(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
-  const source = getFormDraft(formId);
+  const central = openCentralStore_();
+  const source = formRepositoryGetDraft_(formId, central);
   if (!source || !source.schema) throw new Error('Formulář nebyl nalezen.');
 
   const schema = JSON.parse(JSON.stringify(source.schema));
@@ -27,7 +28,13 @@ function duplicateFormDraft(formId) {
   schema.formId = newFormId;
   schema.internalTitle = String(schema.internalTitle || schema.title || 'Nový formulář') + ' – kopie';
 
-  saveFormDraft({ formId: newFormId, schema: schema });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    formRepositorySaveDraft_({ formId: newFormId, schema: schema }, central);
+  } finally {
+    lock.releaseLock();
+  }
 
   return {
     ok: true,
