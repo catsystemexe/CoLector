@@ -71,8 +71,8 @@
     .round-controls::-webkit-scrollbar{display:none}
     .round-lock{flex:0 0 auto;height:38px;min-width:48px;padding:0 9px;border:1px solid #dfe5ee;border-radius:12px;background:#f7f8fb;color:#7b8699;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-weight:900;cursor:pointer}
     .round-lock svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-    .round-lock.open{background:#edf9f1;border-color:#c9e8d5;color:#27845d}
-    .round-lock.focused{box-shadow:0 0 0 2px rgba(7,158,174,.16)}
+    .round-lock.open{background:#f7f8fb;border-color:#dfe5ee;color:#7b8699}
+    .round-lock.focused{background:#e8f8f8;border-color:#bce5e5;color:#087f8d;box-shadow:0 0 0 2px rgba(7,158,174,.12)}
     .round-lock:disabled{opacity:.5;cursor:default}
 
     /* CONTENT */
@@ -501,21 +501,20 @@
     function renderRoundControls(){
       roundControlsEl.innerHTML='';
       const rounds=(sessionData&&sessionData.rounds)||[];
+      if(rounds.length<=1)return;
       rounds.forEach(round=>{
         const button=document.createElement('button');
         button.type='button';
-        button.className='round-lock'+(round.unlocked?' open':'')+(round.roundId===focusedRoundId?' focused':'');
+        button.className='round-lock'+(round.roundId===focusedRoundId?' focused':'');
         const partLabel=String.fromCharCode(64+Math.max(1,Number(round.number)||1));
-        button.title=(round.unlocked?'Zamknout':'Odemknout')+' Part '+partLabel;
+        button.title='Zobrazit Part '+partLabel;
         button.setAttribute('aria-label',button.title);
-        button.innerHTML=lockSvg(round.unlocked)+'<span>'+partLabel+'</span>';
+        button.innerHTML='<span>'+partLabel+'</span>';
         button.onclick=()=>{
           const changedRound=focusedRoundId!==round.roundId;
           focusedRoundId=round.roundId;
           if(changedRound)selectedTeamId='';
           renderRoundControls();renderCounts();renderSelectedTeam();
-          button.disabled=true;
-          google.script.run.withSuccessHandler(()=>loadSession(false)).withFailureHandler(error=>{button.disabled=false;alert((error&&error.message)||'Stav Partu se nepodařilo změnit.')}).setRoundLock({formId:FORM_ID,roundId:round.roundId,unlocked:!round.unlocked});
         };
         roundControlsEl.append(button);
       });
@@ -610,7 +609,7 @@
 
       if(!team||!response){
         const partLabel='Part '+String.fromCharCode(64+Math.max(1,Number(round.number)||1));
-        contentEl.innerHTML='<div class="empty"><strong>'+partLabel+' čeká na odevzdání</strong>'+(round.unlocked?'Participantům je tato část otevřená.':'Tato část je momentálně zamčená.')+'</div>';
+        contentEl.innerHTML='<div class="empty"><strong>'+partLabel+' čeká na odevzdání</strong>Zatím nebyla odevzdána žádná odpověď v této části.</div>';
         return;
       }
 
@@ -636,8 +635,7 @@
       sheetButton.disabled=!(result&&result.spreadsheetUrl);
       const rounds=(result&&result.rounds)||[];
       if(!focusedRoundId||!rounds.some(round=>round.roundId===focusedRoundId)){
-        const openRounds=rounds.filter(round=>round.unlocked);
-        focusedRoundId=(openRounds.length?openRounds[openRounds.length-1]:rounds[0]||{}).roundId||'';
+        focusedRoundId=(rounds[0]||{}).roundId||'';
         selectedTeamId='';
       }
       renderRoundControls();
