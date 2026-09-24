@@ -525,10 +525,15 @@ function getHomeFormSummaries() {
   const central = openCentralStore_();
   const forms = formRepositoryList_(central);
   const registry = getFormDataRegistryStore_(central);
+  const runtimeByForm = formRuntimeRepositoryMap_(central);
   const dataByForm = {};
+
   if (registry && registry.getLastRow() > 1) {
     registry.getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues().forEach(row => {
-      if (row[0]) dataByForm[String(row[0])] = {spreadsheetId:String(row[1] || ''), spreadsheetUrl:String(row[2] || '')};
+      if (row[0]) dataByForm[String(row[0])] = {
+        spreadsheetId:String(row[1] || ''),
+        spreadsheetUrl:String(row[2] || '')
+      };
     });
   }
 
@@ -550,51 +555,45 @@ function getHomeFormSummaries() {
     const schemas = schemaByForm[form.formId] || {};
     const effectiveSchema = schemas.publishedSchema || schemas.draftSchema || null;
     const rounds = effectiveSchema ? schemaRounds_(effectiveSchema) : [];
-    const completedByTeam = {};
-    let totalParticipants = 0;
-    let collected = 0;
-    let distributedByRound = {};
+    let runtime = runtimeByForm[form.formId] || null;
 
-    if (data && data.spreadsheetId) {
+    // Transitional one-time backfill for forms that already have historical data.
+    // Once materialized, Home no longer opens that form's output spreadsheet.
+    if (!runtime && data && data.spreadsheetId && effectiveSchema) {
       try {
         const target = SpreadsheetApp.openById(data.spreadsheetId);
-        const teams = getTeamsStore_(target);
-        if (teams && teams.getLastRow() > 1) {
-          const rows = teams.getRange(2, 1, teams.getLastRow() - 1, 4).getValues();
-          totalParticipants = rows.filter(row => row[0]).length;
-          rows.forEach(row => { if (row[0]) completedByTeam[String(row[0])] = []; });
-        }
-
-        if (rounds.length) {
-          distributedByRound = partDistributedCounts_(target, rounds);
-          const meta = getMetaStore_(target);
-          if (meta && meta.getLastRow() > 1) {
-            meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
-              const teamId = String(row[2] || '');
-              if (!teamId) return;
-              const roundId = String(row[8] || rounds[0].id);
-              if (!completedByTeam[teamId]) completedByTeam[teamId] = [];
-              if (!completedByTeam[teamId].includes(roundId)) completedByTeam[teamId].push(roundId);
-            });
-          }
-          collected = Object.keys(completedByTeam).filter(teamId => rounds.every(round => completedByTeam[teamId].includes(round.id))).length;
-        }
+        runtime = ensureRuntimeSummaryForForm_(central, form.formId, effectiveSchema, target);
+        runtimeByForm[form.formId] = runtime;
       } catch (error) {}
     }
 
+    if (!runtime) {
+      runtime = {
+        formId:form.formId,
+        totalParticipants:0,
+        collectedCount:0,
+        roundStats:{},
+        revision:''
+      };
+    }
+    normalizeRuntimeRounds_(runtime, rounds);
+
     const roundStates = schemas.publishedSchema ? getRoundStates_(form.formId, schemas.publishedSchema) : [];
-    const roundSummary = rounds.map((round,index) => ({
-      roundId:round.id,
-      number:index + 1,
-      unlocked:!!((roundStates.find(item => item.roundId === round.id) || {}).unlocked),
-      submittedCount:Object.keys(completedByTeam).filter(teamId => (completedByTeam[teamId] || []).includes(round.id)).length,
-      distributedCount:Number(distributedByRound[round.id]) || 0
-    }));
+    const roundSummary = rounds.map((round,index) => {
+      const stats = runtime.roundStats[round.id] || {};
+      return {
+        roundId:round.id,
+        number:index + 1,
+        unlocked:!!((roundStates.find(item => item.roundId === round.id) || {}).unlocked),
+        submittedCount:Number(stats.submittedCount) || 0,
+        distributedCount:Number(stats.distributedCount) || 0
+      };
+    });
 
     return Object.assign({}, form, {
-      distributedCount:totalParticipants,
-      totalParticipants:totalParticipants,
-      collectedCount:collected,
+      distributedCount:Number(runtime.totalParticipants) || 0,
+      totalParticipants:Number(runtime.totalParticipants) || 0,
+      collectedCount:Number(runtime.collectedCount) || 0,
       dataUrl:data ? data.spreadsheetUrl : '',
       rounds:roundSummary
     });
