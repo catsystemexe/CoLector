@@ -6,6 +6,8 @@ const FORM_META_HEADERS = ['timestamp', 'form_id', 'team_id', 'team_label', 'res
 const ROUND_STATE_PREFIX = 'colector.rounds.';
 const FORM_PART_OPENS_SHEET = '_PART_OPENS';
 const FORM_PART_OPENS_HEADERS = ['team_id', 'round_id', 'opened_at'];
+const FORM_RUNTIME_SHEET = 'FORM_RUNTIME';
+const FORM_RUNTIME_HEADERS = ['form_id', 'total_participants', 'collected_count', 'round_stats_json', 'revision', 'updated_at'];
 const PART_LOCKING_ENABLED = false;
 
 function registerParticipantOpen(payload) {
@@ -18,8 +20,10 @@ function registerParticipantOpen(payload) {
   lock.waitLock(15000);
   try {
     const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema, central);
+    ensureRuntimeSummaryForForm_(central, payload.formId, published.schema, target);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
+    if (team.created) applyRuntimeDelta_(central, payload.formId, schemaRounds_(published.schema), {participantDelta:1});
     return {ok:true,teamLabel:String(team.values[1] || '')};
   } finally {
     lock.releaseLock();
@@ -41,10 +45,12 @@ function submitParticipantResponse(payload) {
   lock.waitLock(15000);
   try {
     const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema, central);
+    ensureRuntimeSummaryForForm_(central, payload.formId, published.schema, target);
     const responses = target.getSheetByName('ODPOVĚDI');
     const meta = ensureMetaHeaders_(target);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
+    if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
     const teamLabel = String(team.values[1] || '');
 
     if (hasResponseId_(meta, payload.responseId)) {
@@ -78,6 +84,10 @@ function submitParticipantResponse(payload) {
     const completedAfter = completed.concat(nextRound.id);
     const complete = rounds.every(round => completedAfter.includes(round.id));
     if (complete) teams.getRange(team.rowIndex, 4).setValue(new Date());
+    applyRuntimeDelta_(central, payload.formId, rounds, {
+      submittedRoundId:nextRound.id,
+      collectedDelta:complete ? 1 : 0
+    });
 
     return {
       ok:true,
@@ -105,8 +115,10 @@ function getParticipantRoundView(payload) {
   lock.waitLock(15000);
   try {
     const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema, central);
+    ensureRuntimeSummaryForForm_(central, payload.formId, published.schema, target);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
+    if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
     const teamLabel = String(team.values[1] || '');
     const completed = completedRoundIdsForTeam_(target, payload.teamId, rounds);
     const nextRound = rounds.find(round => !completed.includes(round.id));
@@ -129,7 +141,8 @@ function getParticipantRoundView(payload) {
       };
     }
 
-    markPartOpened_(target, payload.teamId, nextRound.id, rounds);
+    const opened = markPartOpened_(target, payload.teamId, nextRound.id, rounds);
+    if (opened) applyRuntimeDelta_(central, payload.formId, rounds, {distributedRoundId:nextRound.id});
 
     return {
       status:'ready',
@@ -228,10 +241,11 @@ function getRoundStates_(formId, schema) {
 
 function ensureParticipantTeam_(teams, teamId) {
   let team = findTeamRow_(teams, teamId);
-  if (team) return team;
+  if (team) return Object.assign({created:false}, team);
   const label = nextTeamLabelFromTeams_(teams);
   teams.appendRow([teamId, label, new Date(), '']);
-  return findTeamRow_(teams, teamId);
+  team = findTeamRow_(teams, teamId);
+  return team ? Object.assign({created:true}, team) : null;
 }
 
 function ensureMetaHeaders_(spreadsheet) {
@@ -261,9 +275,10 @@ function markPartOpened_(spreadsheet, teamId, roundId, rounds) {
   const sheet = getOrCreatePartOpensSheet_(spreadsheet, rounds);
   if (sheet.getLastRow() > 1) {
     const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
-    if (values.some(row => String(row[0]) === String(teamId) && String(row[1]) === String(roundId))) return;
+    if (values.some(row => String(row[0]) === String(teamId) && String(row[1]) === String(roundId))) return false;
   }
   sheet.appendRow([String(teamId), String(roundId), new Date()]);
+  return true;
 }
 
 function partDistributedCounts_(spreadsheet, rounds) {
@@ -314,6 +329,106 @@ function derivePartDistributedCounts_(spreadsheet, rounds, counts) {
     });
   }
   return counts;
+}
+
+function ensureRuntimeSummaryForForm_(central, formId, schema, targetSpreadsheet) {
+  const existing = formRuntimeRepositoryGet_(formId, central);
+  if (existing) return normalizeRuntimeRounds_(existing, schemaRounds_(schema));
+
+  const rounds = schemaRounds_(schema);
+  const completedByTeam = {};
+  let totalParticipants = 0;
+  let collectedCount = 0;
+  const roundStats = {};
+  rounds.forEach(round => {
+    roundStats[round.id] = {distributedCount:0, submittedCount:0};
+  });
+
+  const teams = getTeamsStore_(targetSpreadsheet);
+  if (teams && teams.getLastRow() > 1) {
+    teams.getRange(2, 1, teams.getLastRow() - 1, 4).getValues().forEach(row => {
+      if (!row[0]) return;
+      const teamId = String(row[0]);
+      totalParticipants += 1;
+      completedByTeam[teamId] = [];
+    });
+  }
+
+  const distributed = partDistributedCounts_(targetSpreadsheet, rounds);
+  Object.keys(distributed).forEach(roundId => {
+    if (!roundStats[roundId]) roundStats[roundId] = {distributedCount:0, submittedCount:0};
+    roundStats[roundId].distributedCount = Number(distributed[roundId]) || 0;
+  });
+
+  const meta = getMetaStore_(targetSpreadsheet);
+  if (meta && meta.getLastRow() > 1) {
+    meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
+      const teamId = String(row[2] || '');
+      if (!teamId) return;
+      const roundId = String(row[8] || (rounds[0] && rounds[0].id) || '');
+      if (!roundId) return;
+      if (!completedByTeam[teamId]) completedByTeam[teamId] = [];
+      if (!completedByTeam[teamId].includes(roundId)) {
+        completedByTeam[teamId].push(roundId);
+        if (!roundStats[roundId]) roundStats[roundId] = {distributedCount:0, submittedCount:0};
+        roundStats[roundId].submittedCount += 1;
+      }
+    });
+  }
+
+  collectedCount = Object.keys(completedByTeam)
+    .filter(teamId => rounds.length && rounds.every(round => completedByTeam[teamId].includes(round.id)))
+    .length;
+
+  return formRuntimeRepositorySave_({
+    formId:formId,
+    totalParticipants:totalParticipants,
+    collectedCount:collectedCount,
+    roundStats:roundStats,
+    revision:Utilities.getUuid()
+  }, central);
+}
+
+function normalizeRuntimeRounds_(runtime, rounds) {
+  runtime.roundStats = runtime.roundStats || {};
+  (rounds || []).forEach(round => {
+    if (!runtime.roundStats[round.id]) {
+      runtime.roundStats[round.id] = {distributedCount:0, submittedCount:0};
+    }
+  });
+  return runtime;
+}
+
+function applyRuntimeDelta_(central, formId, rounds, delta) {
+  let runtime = formRuntimeRepositoryGet_(formId, central);
+  if (!runtime) {
+    runtime = {
+      formId:formId,
+      totalParticipants:0,
+      collectedCount:0,
+      roundStats:{},
+      revision:''
+    };
+  }
+  normalizeRuntimeRounds_(runtime, rounds);
+
+  runtime.totalParticipants = Math.max(0, Number(runtime.totalParticipants || 0) + Number(delta.participantDelta || 0));
+  runtime.collectedCount = Math.max(0, Number(runtime.collectedCount || 0) + Number(delta.collectedDelta || 0));
+
+  if (delta.distributedRoundId) {
+    const stats = runtime.roundStats[String(delta.distributedRoundId)] || {distributedCount:0, submittedCount:0};
+    stats.distributedCount = Math.max(0, Number(stats.distributedCount || 0) + 1);
+    runtime.roundStats[String(delta.distributedRoundId)] = stats;
+  }
+
+  if (delta.submittedRoundId) {
+    const stats = runtime.roundStats[String(delta.submittedRoundId)] || {distributedCount:0, submittedCount:0};
+    stats.submittedCount = Math.max(0, Number(stats.submittedCount || 0) + 1);
+    runtime.roundStats[String(delta.submittedRoundId)] = stats;
+  }
+
+  runtime.revision = Utilities.getUuid();
+  return formRuntimeRepositorySave_(runtime, central);
 }
 
 function getSessionView(formId) {
