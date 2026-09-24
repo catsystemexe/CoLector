@@ -568,13 +568,15 @@ function getHomeFormSummaries() {
   const perf = perfStart_('getHomeFormSummaries');
   const central = openCentralStore_();
   perfMark_(perf, 'central-open');
-  const forms = formRepositoryList_(central);
-  perfMark_(perf, 'forms-read', {count:forms.length});
+
+  const formRows = formRepositoryListWithSchemas_(central);
+  perfMark_(perf, 'forms-read', {count:formRows.length});
+
   const registry = getFormDataRegistryStore_(central);
   const runtimeByForm = formRuntimeRepositoryMap_(central);
   perfMark_(perf, 'runtime-read', {count:Object.keys(runtimeByForm).length});
-  const dataByForm = {};
 
+  const dataByForm = {};
   if (registry && registry.getLastRow() > 1) {
     registry.getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues().forEach(row => {
       if (row[0]) dataByForm[String(row[0])] = {
@@ -583,25 +585,12 @@ function getHomeFormSummaries() {
       };
     });
   }
-
-  const schemaByForm = {};
-  const formsSheet = getFormsStore_(central);
-  if (formsSheet && formsSheet.getLastRow() > 1) {
-    formsSheet.getRange(2, 1, formsSheet.getLastRow() - 1, FORMS_HEADERS.length).getValues().forEach(row => {
-      if (!row[0]) return;
-      let draftSchema = null;
-      let publishedSchema = null;
-      try { draftSchema = row[3] ? JSON.parse(String(row[3])) : null; } catch (error) {}
-      try { publishedSchema = row[7] ? JSON.parse(String(row[7])) : null; } catch (error) {}
-      schemaByForm[String(row[0])] = {draftSchema:draftSchema,publishedSchema:publishedSchema};
-    });
-  }
+  perfMark_(perf, 'registry-read', {count:Object.keys(dataByForm).length});
 
   let backfilled = 0;
-  const result = forms.map(form => {
+  const result = formRows.map(form => {
     const data = dataByForm[form.formId] || null;
-    const schemas = schemaByForm[form.formId] || {};
-    const effectiveSchema = schemas.publishedSchema || schemas.draftSchema || null;
+    const effectiveSchema = form.publishedSchema || form.draftSchema || null;
     const rounds = effectiveSchema ? schemaRounds_(effectiveSchema) : [];
     let runtime = runtimeByForm[form.formId] || null;
 
@@ -627,7 +616,7 @@ function getHomeFormSummaries() {
     }
     normalizeRuntimeRounds_(runtime, rounds);
 
-    const roundStates = schemas.publishedSchema ? getRoundStates_(form.formId, schemas.publishedSchema) : [];
+    const roundStates = form.publishedSchema ? getRoundStates_(form.formId, form.publishedSchema) : [];
     const roundSummary = rounds.map((round,index) => {
       const stats = runtime.roundStats[round.id] || {};
       return {
@@ -639,15 +628,23 @@ function getHomeFormSummaries() {
       };
     });
 
-    return Object.assign({}, form, {
+    return {
+      formId:form.formId,
+      internalTitle:form.internalTitle,
+      title:form.title,
+      status:form.status,
+      createdAt:form.createdAt,
+      updatedAt:form.updatedAt,
+      publishedAt:form.publishedAt,
       distributedCount:Number(runtime.totalParticipants) || 0,
       totalParticipants:Number(runtime.totalParticipants) || 0,
       collectedCount:Number(runtime.collectedCount) || 0,
       dataUrl:data ? data.spreadsheetUrl : '',
       rounds:roundSummary
-    });
+    };
   });
-  perfEnd_(perf, {forms:forms.length,backfilled:backfilled});
+
+  perfEnd_(perf, {forms:formRows.length,backfilled:backfilled});
   return result;
 }
 
