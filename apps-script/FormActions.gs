@@ -3,18 +3,27 @@ function deleteFormDraft(formId) {
 
   const central = openCentralStore_();
   const sheet = getFormsStore_(central);
-  if (!sheet) return { ok: true, deleted: false };
-
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    if (formRepositoryIsDistributed_(formId, central)) {
-      throw new Error('Rozdaný formulář nelze smazat. Nejprve dokončete práci se Session.');
-    }
-    const rowIndex = findFormRow_(sheet, formId);
-    if (!rowIndex) return { ok: true, deleted: false };
-    sheet.deleteRow(rowIndex);
-    return { ok: true, deleted: true };
+    const rowIndex = sheet ? findFormRow_(sheet, formId) : 0;
+    const dataRecord = getFormDataRecord_(formId, central);
+
+    if (rowIndex) sheet.deleteRow(rowIndex);
+    formRuntimeRepositoryDelete_(formId, central);
+    deleteFormDataRecord_(formId, central);
+
+    const properties = PropertiesService.getScriptProperties();
+    properties.deleteProperty(ROUND_STATE_PREFIX + formId);
+    properties.deleteProperty(SESSION_REVISION_PREFIX + formId);
+
+    return {
+      ok:true,
+      deleted:!!rowIndex,
+      sessionDeleted:true,
+      sheetPreserved:!!(dataRecord && dataRecord.spreadsheetId),
+      spreadsheetUrl:dataRecord ? dataRecord.spreadsheetUrl : ''
+    };
   } finally {
     lock.releaseLock();
   }
