@@ -229,6 +229,9 @@
 <script>
 const STORAGE_KEY='colector.editor.draft.v3';
 const LEGACY_STORAGE_KEY='colector.editor.draft.v2';
+const FORM_CACHE_PREFIX='colector.editor.form.v1.';
+const ROUTE_FORM_ID=String(window.COLECTOR_ROUTE_FORM_ID||'');
+const ROUTE_NEW=window.COLECTOR_ROUTE_NEW===true;
 const state=loadDraft()||{version:3,formId:createId('form'),internalTitle:'Nový formulář',rounds:[createRound(true)]};
 if(!state.formId)state.formId=createId('form');
 
@@ -245,7 +248,35 @@ let saveTimer=null,draggedField=null,saveGeneration=0,previewRoundIndex=0;
 function createId(prefix){return prefix+'_'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+Math.random().toString(36).slice(2))}
 function createField(type='textarea'){const field={id:createId('field'),type:type,label:'',required:false,height:115,accent:'blue'};if(type==='checkbox')field.options=[{id:createId('opt'),label:'Možnost 1'},{id:createId('opt'),label:'Možnost 2'}];return field}
 function createRound(first){return{id:first?'round_1':createId('round'),title:'',instructions:'',fields:[createField('textarea')]}}
-function loadDraft(){try{const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem(LEGACY_STORAGE_KEY);return raw?JSON.parse(raw):null}catch(e){return null}}
+function readFormCacheRecord(formId){
+  if(!formId)return null;
+  try{
+    const raw=localStorage.getItem(FORM_CACHE_PREFIX+formId);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw);
+    return parsed&&parsed.schema&&String(parsed.schema.formId||'')===String(formId)?parsed:null;
+  }catch(e){return null}
+}
+function writeFormCache(schema,savedAt){
+  if(!schema||!schema.formId)return;
+  try{localStorage.setItem(FORM_CACHE_PREFIX+schema.formId,JSON.stringify({schema:schema,savedAt:Number(savedAt)||Date.now()}))}catch(e){}
+}
+function clearFormCache(formId){
+  if(!formId)return;
+  try{localStorage.removeItem(FORM_CACHE_PREFIX+formId)}catch(e){}
+}
+function loadDraft(){
+  try{
+    if(ROUTE_NEW)return null;
+    if(ROUTE_FORM_ID){
+      const cached=readFormCacheRecord(ROUTE_FORM_ID);
+      if(cached&&cached.schema)return cached.schema;
+      return {version:3,formId:ROUTE_FORM_ID,internalTitle:'Načítám…',rounds:[createRound(true)]};
+    }
+    const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem(LEGACY_STORAGE_KEY);
+    return raw?JSON.parse(raw):null;
+  }catch(e){return null}
+}
 
 function normalizeField(field){
   field=field||createField('textarea');
@@ -307,15 +338,31 @@ function setSaveStatus(text,mode,title){
   saveStatusEl.classList.toggle('error',mode==='error');
   saveStatusEl.title=title||text;
 }
-function scheduleSave(){clearTimeout(saveTimer);const generation=++saveGeneration;setSaveStatus('Ukládám…','saving','Ukládám draft');saveTimer=setTimeout(()=>persistDraft(generation),1800)}
+function writeLocalDraft(schema,savedAt){
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(schema));
+    writeFormCache(schema,savedAt);
+    return true;
+  }catch(e){return false}
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  const generation=++saveGeneration;
+  const schema=buildSchema();
+  if(!writeLocalDraft(schema,Date.now())){setSaveStatus('Chyba','error','Draft se nepodařilo uložit lokálně');return}
+  setSaveStatus('Ukládám…','saving','Ukládám draft');
+  saveTimer=setTimeout(()=>persistDraft(generation),1800);
+}
 function persistDraft(generation){
   const schema=buildSchema();
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(schema))}catch(e){if(generation===saveGeneration)setSaveStatus('Chyba','error','Draft se nepodařilo uložit ani lokálně');return}
+  if(!writeLocalDraft(schema,Date.now())){if(generation===saveGeneration)setSaveStatus('Chyba','error','Draft se nepodařilo uložit ani lokálně');return}
   if(!(window.google&&google.script&&google.script.run)){if(generation===saveGeneration)setSaveStatus('Lokálně','local','Draft je uložen pouze v tomto prohlížeči');return}
   google.script.run.withSuccessHandler(result=>{
     if(generation!==saveGeneration)return;
-    if(result&&result.ok)setSaveStatus('Uloženo','cloud','Draft uložen do Google Sheets');
-    else setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud nepotvrdil uložení');
+    if(result&&result.ok){
+      writeFormCache(schema,Date.parse(result.updatedAt||'')||Date.now());
+      setSaveStatus('Uloženo','cloud','Draft uložen do Google Sheets');
+    }else setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud nepotvrdil uložení');
   }).withFailureHandler(error=>{
     console.warn('Cloud autosave selhal.',error);
     if(generation===saveGeneration)setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud autosave selhal');
