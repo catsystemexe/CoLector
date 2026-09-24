@@ -356,7 +356,7 @@ function deleteField(round,fieldId){round.fields=round.fields.filter(field=>fiel
 function reorderFields(round,fromId,toId){if(!fromId||fromId===toId)return;const from=round.fields.findIndex(f=>f.id===fromId),to=round.fields.findIndex(f=>f.id===toId);if(from<0||to<0)return;const moved=round.fields.splice(from,1)[0];round.fields.splice(to,0,moved);renderEditor();scheduleSave();renderPreview()}
 function addField(round,type){round.fields.push(normalizeField(createField(type)));renderEditor();scheduleSave();renderPreview()}
 function addRound(){state.rounds.push(createRound(false));previewRoundIndex=state.rounds.length-1;renderEditor();scheduleSave();renderPreview();setTimeout(()=>{const nodes=document.querySelectorAll('.round-editor');const target=nodes[nodes.length-1];if(target)target.scrollIntoView({behavior:'smooth',block:'start'})},0)}
-function deleteRound(roundId){if(state.rounds.length<=1)return;if(!confirm('Smazat tento Round?'))return;state.rounds=state.rounds.filter(round=>round.id!==roundId);previewRoundIndex=Math.min(previewRoundIndex,state.rounds.length-1);syncLegacyAliases();renderEditor();scheduleSave();renderPreview()}
+function deleteRound(roundId){if(state.rounds.length<=1)return;if(!confirm('Smazat tento Part?'))return;state.rounds=state.rounds.filter(round=>round.id!==roundId);previewRoundIndex=Math.min(previewRoundIndex,state.rounds.length-1);syncLegacyAliases();renderEditor();scheduleSave();renderPreview()}
 
 function renderFieldCard(round,field){
   const card=document.createElement('article');card.className='field-card';card.dataset.id=field.id;card.draggable=true;card.style.setProperty('--field-accent',accentColor(field.accent));card.style.background=fieldBackground(field.accent);
@@ -383,9 +383,9 @@ function renderEditor(){
   roundsRoot.innerHTML='';
   state.rounds.forEach((round,index)=>{
     const section=document.createElement('section');section.className='editor-canvas round-editor';section.dataset.roundId=round.id;
-    const badge=document.createElement('div');badge.className='round-label';badge.textContent='Round '+(index+1);section.appendChild(badge);
+    const badge=document.createElement('div');badge.className='round-label';badge.textContent='Part '+String.fromCharCode(65+index);section.appendChild(badge);
     if(state.rounds.length>1&&index>0){
-      const del=document.createElement('button');del.type='button';del.className='round-delete';del.title='Smazat Round '+(index+1);del.setAttribute('aria-label',del.title);del.innerHTML='<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>';del.onclick=()=>deleteRound(round.id);section.appendChild(del);
+      const del=document.createElement('button');del.type='button';del.className='round-delete';del.title='Smazat Part '+String.fromCharCode(65+index);del.setAttribute('aria-label',del.title);del.innerHTML='<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>';del.onclick=()=>deleteRound(round.id);section.appendChild(del);
     }
     const title=document.createElement('input');title.className='editable-title';title.type='text';title.placeholder='Nadpis formuláře';title.value=round.title||'';title.oninput=()=>{round.title=title.value;if(index===0)syncLegacyAliases();scheduleSave();renderPreview()};
     const instructions=document.createElement('textarea');instructions.className='editable-instructions';instructions.rows=1;instructions.placeholder='Klikněte a napište instrukci';instructions.value=round.instructions||'';instructions.oninput=()=>{round.instructions=instructions.value;instructions.style.height='auto';instructions.style.height=instructions.scrollHeight+'px';if(index===0)syncLegacyAliases();scheduleSave();renderPreview()};
@@ -395,7 +395,7 @@ function renderEditor(){
     const button=document.createElement('button');button.className='add-button';button.type='button';button.textContent='+';
     const menu=document.createElement('div');menu.className='add-menu';
     [['textarea','Textové pole'],['checkbox','Checkbox'],['yes_no','Ano / Ne']].forEach(item=>{const option=document.createElement('button');option.className='add-option';option.type='button';option.textContent=item[1];option.onclick=()=>{addField(round,item[0]);menu.classList.remove('open')};menu.append(option)});
-    if(index===state.rounds.length-1){const divider=document.createElement('div');divider.className='add-menu-divider';menu.append(divider);const newRound=document.createElement('button');newRound.type='button';newRound.className='add-option round-option';newRound.textContent='＋ Nový Round';newRound.onclick=()=>{menu.classList.remove('open');addRound()};menu.append(newRound)}
+    if(index===state.rounds.length-1){const divider=document.createElement('div');divider.className='add-menu-divider';menu.append(divider);const newRound=document.createElement('button');newRound.type='button';newRound.className='add-option round-option';newRound.textContent='＋ Nový Part';newRound.onclick=()=>{menu.classList.remove('open');addRound()};menu.append(newRound)}
     button.onclick=e=>{e.stopPropagation();document.querySelectorAll('.add-menu.open').forEach(x=>{if(x!==menu)x.classList.remove('open')});menu.classList.toggle('open')};
     addWrap.append(button,menu);section.append(addWrap);roundsRoot.append(section);
     requestAnimationFrame(()=>{instructions.style.height='auto';instructions.style.height=instructions.scrollHeight+'px'});
@@ -413,7 +413,7 @@ function renderPreview(){
   previewContent.innerHTML='';
   if(state.rounds.length>1){
     const tabs=document.createElement('div');tabs.className='preview-round-tabs';
-    state.rounds.forEach((item,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='preview-round-tab'+(index===previewRoundIndex?' active':'');tab.textContent='Round '+(index+1);tab.onclick=()=>{previewRoundIndex=index;renderPreview()};tabs.append(tab)});
+    state.rounds.forEach((item,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='preview-round-tab'+(index===previewRoundIndex?' active':'');tab.textContent='Part '+String.fromCharCode(65+index);tab.onclick=()=>{previewRoundIndex=index;renderPreview()};tabs.append(tab)});
     previewContent.append(tabs);
   }
   const h=document.createElement('h2');h.textContent=round.title||'Nadpis formuláře';previewContent.append(h);
