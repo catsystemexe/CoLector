@@ -693,8 +693,7 @@
     }
     function showQr(){
       if(!sessionData)return;
-      const first=(sessionData.rounds||[])[0];
-      qrTitle.textContent=(first&&first.title)||(sessionData.schema&&sessionData.schema.internalTitle)||'Formulář';
+      qrTitle.textContent=(sessionData.schema&&sessionData.schema.internalTitle)||'Formulář';
       qrBox.innerHTML='';qrScreen.classList.add('open');
       loadQrLibrary().then(()=>{const size=Math.max(220,Math.min(480,Math.floor(Math.min(window.innerWidth*.72,window.innerHeight*.60))));new QRCode(qrBox,{text:participantUrl(),width:size,height:size,colorDark:'#111827',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M})}).catch(()=>{qrBox.textContent='QR kód se nepodařilo načíst.'});
     }
