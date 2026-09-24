@@ -222,118 +222,43 @@ function getEditorRouteBootstrap_() {
 
 function saveFormDraft(payload) {
   if (!payload || !payload.formId || !payload.schema) throw new Error('Neplatný draft formuláře.');
-  const schema = payload.schema;
-  schema.formId = payload.formId;
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateFormsSheet_(spreadsheet);
-  const lock = LockService.getScriptLock();lock.waitLock(10000);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
-    const now = new Date();
-    const rowIndex = findFormRow_(sheet, payload.formId);
-    const existing = rowIndex ? sheet.getRange(rowIndex,1,1,FORMS_HEADERS.length).getValues()[0] : [];
-    const row = [
-      payload.formId,
-      String(schema.internalTitle || ''),
-      String(schema.title || ''),
-      JSON.stringify(schema),
-      existing[4] || 'draft',
-      existing[5] || now,
-      now,
-      existing[7] || '',
-      existing[8] || ''
-    ];
-    if (rowIndex) sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]); else sheet.appendRow(row);
-    return {ok:true,formId:payload.formId,updatedAt:now.toISOString()};
-  } finally {lock.releaseLock();}
+    return formRepositorySaveDraft_(payload, openCentralStore_());
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function publishFormDraft(payload) {
   if (!payload || !payload.formId || !payload.schema) throw new Error('Neplatný formulář k publikování.');
-  const schema = payload.schema;
-  schema.formId = payload.formId;
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateFormsSheet_(spreadsheet);
-  const lock = LockService.getScriptLock();lock.waitLock(10000);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
-    const now = new Date();
-    const rowIndex = findFormRow_(sheet, payload.formId);
-    const existing = rowIndex ? sheet.getRange(rowIndex,1,1,FORMS_HEADERS.length).getValues()[0] : [];
-    const row = [
-      payload.formId,
-      String(schema.internalTitle || ''),
-      String(schema.title || ''),
-      JSON.stringify(schema),
-      'published',
-      existing[5] || now,
-      now,
-      JSON.stringify(schema),
-      now
-    ];
-    if (rowIndex) sheet.getRange(rowIndex,1,1,row.length).setValues([row]); else sheet.appendRow(row);
-    return {ok:true,formId:payload.formId,publishedAt:now.toISOString()};
-  } finally {lock.releaseLock();}
+    return formRepositoryPublish_(payload, openCentralStore_());
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getFormDraft(formId) {
   if (!formId) throw new Error('Chybí form_id.');
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateFormsSheet_(spreadsheet);
-  const rowIndex = findFormRow_(sheet, formId);
-  if (!rowIndex) return null;
-  const values = sheet.getRange(rowIndex, 1, 1, FORMS_HEADERS.length).getValues()[0];
-  let schema = null;
-  try {schema = JSON.parse(values[3] || '{}');} catch (error) {throw new Error('Uložený form_schema není validní JSON.');}
-  let publishedSchema=null;
-  if(values[7]){
-    try {publishedSchema=JSON.parse(values[7]);} catch(error){publishedSchema=null;}
-  }
-  return {
-    formId:values[0],internalTitle:values[1]||'',title:values[2]||'',schema:schema,status:values[4]||'draft',
-    createdAt:toIso_(values[5]),updatedAt:toIso_(values[6]),publishedAt:toIso_(values[8]),
-    publishedSchema:publishedSchema
-  };
+  return formRepositoryGetDraft_(formId, openCentralStore_());
 }
 
 function getPublishedForm(formId) {
   if (!formId) return null;
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateFormsSheet_(spreadsheet);
-  const rowIndex = findFormRow_(sheet, formId);
-  if (!rowIndex) return null;
-  const values = sheet.getRange(rowIndex,1,1,FORMS_HEADERS.length).getValues()[0];
-  if (!values[7]) return null;
-  let schema = null;
-  try {schema=JSON.parse(values[7]);} catch(error){throw new Error('Publikovaný form_schema není validní JSON.');}
-  return {formId:values[0],schema:schema,publishedAt:toIso_(values[8])};
+  return formRepositoryGetPublished_(formId, openCentralStore_());
 }
 
 function listFormDrafts() {
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateFormsSheet_(spreadsheet);
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
-  const values = sheet.getRange(2, 1, lastRow - 1, FORMS_HEADERS.length).getValues();
-  return values.map(row => {
-    let schema = {};
-    try {schema = JSON.parse(row[3] || '{}');} catch (error) {}
-    return {
-      formId:row[0],internalTitle:row[1]||schema.internalTitle||'',title:row[2]||schema.title||'',status:row[4]||'draft',
-      createdAt:toIso_(row[5]),updatedAt:toIso_(row[6]),publishedAt:toIso_(row[8])
-    };
-  }).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  return formRepositoryList_(openCentralStore_());
 }
 
 function getOrCreateFormsSheet_(spreadsheet) {
-  let sheet = spreadsheet.getSheetByName(FORMS_SHEET);
-  if (!sheet) sheet = spreadsheet.insertSheet(FORMS_SHEET);
-  const currentWidth = sheet.getLastColumn();
-  const width = Math.max(currentWidth, FORMS_HEADERS.length);
-  const existing = currentWidth ? sheet.getRange(1,1,1,currentWidth).getValues()[0] : [];
-  let changed = existing.length < FORMS_HEADERS.length;
-  FORMS_HEADERS.forEach((header,index)=>{if(existing[index]!==header)changed=true;});
-  if (changed) sheet.getRange(1,1,1,FORMS_HEADERS.length).setValues([FORMS_HEADERS]);
-  sheet.setFrozenRows(1);
-  return sheet;
+  // Compatibility alias for legacy mutating paths. Read paths must use getFormsStore_().
+  return ensureFormsStore_(spreadsheet);
 }
 
 function findFormRow_(sheet, formId) {
