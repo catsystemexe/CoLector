@@ -17,7 +17,7 @@
     const TEAM_KEY='colector.team.id';
     const sheet=document.getElementById('sheet');
     const teamId=getTeamId();
-    let currentSchema=null,currentRoundId='',currentRoundNumber=0,currentStatus='',pollTimer=null;
+    let currentSchema=null,currentRoundId='',currentRoundNumber=0,currentStatus='',pollTimer=null,lockingEnabled=false;
 
     function makeId(prefix){return prefix+'_'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+Math.random().toString(36).slice(2))}
     function getTeamId(){try{let id=localStorage.getItem(TEAM_KEY);if(!id){id=makeId('team');localStorage.setItem(TEAM_KEY,id)}return id}catch(e){return makeId('team')}}
@@ -118,6 +118,8 @@
     }
 
     function handleView(result,force){
+      lockingEnabled=!!(result&&result.lockingEnabled);
+      if(!lockingEnabled&&pollTimer){clearInterval(pollTimer);pollTimer=null}
       if(!result||result.status==='unavailable'){renderUnavailable();return}
       if(result.status==='complete'){renderComplete();return}
       if(result.status==='locked'){
@@ -131,11 +133,11 @@
 
     function loadView(force){
       if(!FORM_ID){renderUnavailable();return}
-      google.script.run.withSuccessHandler(result=>handleView(result,!!force)).withFailureHandler(()=>{if(currentStatus!=='ready')sheet.innerHTML='<div class="state"><strong>Formulář se nepodařilo načíst</strong>Zkuste stránku obnovit.</div>'}).getParticipantRoundView({formId:FORM_ID,teamId:teamId});
+      google.script.run.withSuccessHandler(result=>{handleView(result,!!force);if(lockingEnabled&&!pollTimer)pollTimer=setInterval(pollGate,3000)}).withFailureHandler(()=>{if(currentStatus!=='ready')sheet.innerHTML='<div class="state"><strong>Formulář se nepodařilo načíst</strong>Zkuste stránku obnovit.</div>'}).getParticipantRoundView({formId:FORM_ID,teamId:teamId});
     }
 
     function pollGate(){
-      if(!FORM_ID||!currentRoundId||currentStatus==='complete'||currentStatus==='unavailable')return;
+      if(!lockingEnabled||!FORM_ID||!currentRoundId||currentStatus==='complete'||currentStatus==='unavailable')return;
       const statusBefore=currentStatus;
       google.script.run.withSuccessHandler(result=>{
         if(!result)return;
@@ -149,7 +151,6 @@
     }
 
     loadView(true);
-    pollTimer=setInterval(pollGate,3000);
   </script>
 </body>
 </html>
