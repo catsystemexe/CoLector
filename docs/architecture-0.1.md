@@ -266,6 +266,17 @@ Home již nemá při každém načtení otevírat datový Sheet každého formul
 
 Starší formuláře bez runtime záznamu se jednorázově dopočítají ze stávajících technických dat. Následné změny aktualizují runtime inkrementálně.
 
+### Neměnnost rozdaného formuláře
+
+Jakmile formulář otevře alespoň jeden participant, považuje se za rozdaný a jeho struktura je zmrazená:
+
+- Editor už nesmí ukládat změny schématu,
+- formulář nelze znovu publikovat se změněnou strukturou,
+- rozdaný formulář nelze během aktivní práce smazat,
+- duplikace zůstává povolená, protože vytváří nový nezávislý draft.
+
+Toto pravidlo chrání konzistenci `ODPOVĚDI`, technických metadat i materializovaného `FORM_RUNTIME` během probíhající Session.
+
 ### Session refresh
 
 Session nepřenáší celý dataset v pravidelném intervalu. Klient polluje pouze lehký revision token; celý session snapshot se načte znovu jen při změně revision.
