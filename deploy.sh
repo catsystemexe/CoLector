@@ -4,6 +4,12 @@ set -euo pipefail
 STASH_NAME="local replit clasp config"
 DEPLOYMENT_ID="AKfycbzdAKO4HSXN-i95nuIdcr-ILHnAqBhUO2P1xtp-bifBHsTMhX7lCP542fgNL-MDZXO6pQ"
 STASHED=0
+BRANCH="${COLECTOR_BRANCH:-$(git branch --show-current)}"
+
+if [[ -z "$BRANCH" ]]; then
+  echo "ERROR: Detached HEAD. Set COLECTOR_BRANCH explicitly."
+  exit 1
+fi
 
 cleanup() {
   if [[ "$STASHED" -eq 1 ]]; then
@@ -30,8 +36,8 @@ else
 fi
 
 echo
-echo "Pulling origin/main with rebase..."
-git pull --rebase origin main
+echo "Pulling origin/$BRANCH with rebase..."
+git pull --rebase origin "$BRANCH"
 
 echo
 echo "Restoring local config before clasp push..."
