@@ -33,7 +33,8 @@
       right:0;
       height:var(--header);
       display:grid;
-      grid-template-columns:auto auto minmax(0,1fr);
+      grid-template-columns:auto auto;
+      justify-content:start;
       align-items:center;
       gap:10px;
       padding:6px 10px;
@@ -66,47 +67,6 @@
     .session-count .submitted-count{font-size:25px;color:#23975b}
     .session-count .count-sep{font-size:19px;color:#9aa4b5;font-weight:700}
     .session-count .distributed-count{font-size:25px;color:#2671d9}
-
-    .teams{
-      --team-size:18px;
-      --team-rows:1;
-      min-width:0;
-      height:100%;
-      display:grid;
-      grid-template-columns:repeat(10,var(--team-size));
-      grid-template-rows:repeat(var(--team-rows),var(--team-size));
-      grid-auto-flow:row;
-      gap:2px;
-      align-content:center;
-      justify-content:start;
-      overflow:hidden;
-      padding:2px 1px;
-      margin-left:8px;
-    }
-
-    .team-square{
-      width:var(--team-size);
-      height:var(--team-size);
-      border-radius:4px;
-      display:grid;
-      place-items:center;
-      font-size:9px;
-      line-height:1;
-      font-weight:850;
-      user-select:none;
-      cursor:default;
-      box-sizing:border-box;
-    }
-    .team-square.submitted{
-      background:#36ae6a;
-      border:1px solid #36ae6a;
-      color:#fff;
-    }
-    .team-square.working{
-      background:#fff;
-      border:1.5px solid #3c89e8;
-      color:#2671d9;
-    }
 
     /* CONTENT */
     main{
@@ -352,8 +312,6 @@
       .section-name{font-size:14px}
       .session-count .submitted-count,.session-count .distributed-count{font-size:22px}
       .session-count .count-sep{font-size:16px}
-      .teams{--team-size:17px;gap:2px;padding:1px 0;margin-left:9px}
-      .team-square{border-radius:4px;font-size:8.5px}
       main{padding:10px 8px 20px}
       .bottom-dock{border-radius:19px;padding-left:8px;padding-right:8px}
       .dock-action{min-height:62px;font-size:12px}
@@ -367,8 +325,6 @@
       .section-name{font-size:13px}
       .session-count .submitted-count,.session-count .distributed-count{font-size:21px}
       .session-count .count-sep{font-size:15px}
-      .teams{--team-size:16px;gap:2px;margin-left:8px}
-      .team-square{border-radius:3px;font-size:8px}
     }
 
     @media(prefers-reduced-motion:reduce){
@@ -404,13 +360,12 @@
       <span class="section-name">/ Session</span>
     </div>
 
-    <div class="session-count" aria-label="Vybraných z rozdaných">
+    <div class="session-count" aria-label="Odevzdaných z rozdaných">
       <span id="submittedCount" class="submitted-count">0</span>
       <span class="count-sep">/</span>
       <span id="distributedCount" class="distributed-count">0</span>
     </div>
 
-    <div id="teams" class="teams" aria-label="Stav týmů"></div>
   </header>
 
   <main>
@@ -464,7 +419,6 @@
     const APP_URL=<?!= JSON.stringify(appUrl) ?>;
     const FORM_ID=<?!= JSON.stringify(formId) ?>;
 
-    const teamsEl=document.getElementById('teams');
     const submittedCountEl=document.getElementById('submittedCount');
     const distributedCountEl=document.getElementById('distributedCount');
     const contentEl=document.getElementById('content');
@@ -498,29 +452,11 @@
       setTimeout(()=>{overlay.style.display='none'},180);
     }
 
-    function teamNumber(label,index){
-      const match=String(label||'').match(/(\d+)/);
-      return match?match[1]:String(index+1);
-    }
-
-    function renderTeams(){
-      teamsEl.innerHTML='';
+    function renderCounts(){
       const teams=(sessionData&&sessionData.teams)||[];
       const submitted=teams.filter(team=>team.submitted).length;
-
       submittedCountEl.textContent=String(submitted);
       distributedCountEl.textContent=String(teams.length);
-      const rowsUsed=Math.max(1,Math.min(4,Math.ceil(teams.length/10)));
-      teamsEl.style.setProperty('--team-rows',String(rowsUsed));
-
-      teams.forEach((team,index)=>{
-        const square=document.createElement('span');
-        square.className='team-square '+(team.submitted?'submitted':'working');
-        square.textContent=teamNumber(team.teamLabel,index);
-        square.title=team.teamLabel+(team.submitted?' — vybráno':' — rozdáno');
-        square.setAttribute('aria-label',square.title);
-        teamsEl.appendChild(square);
-      });
     }
 
     function fieldTitle(field){
@@ -592,7 +528,7 @@
       const response=sessionData.answersByTeam[selectedTeamId];
 
       if(!team || !team.submitted || !response){
-        contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong>Kartu zobrazíš kliknutím na zelený odevzdaný tým nahoře.</div>';
+        contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong>Odevzdaná karta se zobrazí automaticky po odeslání.</div>';
         return;
       }
 
@@ -643,10 +579,10 @@
       if(selectedTeamId && !submitted.some(team=>team.teamId===selectedTeamId))selectedTeamId='';
       if(!selectedTeamId && submitted.length)selectedTeamId=submitted[0].teamId;
 
-      renderTeams();
+      renderCounts();
 
       if((result.teams||[]).length===0){
-        contentEl.innerHTML='<div class="empty"><strong>Zatím žádný tým</strong>Po otevření formuláře prvním týmem se jeho stav objeví nahoře.</div>';
+        contentEl.innerHTML='<div class="empty"><strong>Zatím žádný tým</strong>Po otevření formuláře prvním účastníkem se počítadlo nahoře aktualizuje.</div>';
         return;
       }
 
