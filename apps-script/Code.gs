@@ -114,7 +114,7 @@ function getEditorRouteBootstrap_() {
   }
 
   function showQr(){
-    const title=state.title||state.internalTitle||'Formulář';
+    const title=state.internalTitle||state.title||'Formulář';
     const box=qrScreen.querySelector('.qr-box');
     qrScreen.querySelector('.qr-title').textContent=title;
     box.innerHTML='';qrScreen.classList.add('open');
