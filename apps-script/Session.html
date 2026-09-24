@@ -515,7 +515,7 @@
           if(changedRound)selectedTeamId='';
           renderRoundControls();renderCounts();renderSelectedTeam();
           button.disabled=true;
-          google.script.run.withSuccessHandler(()=>loadSession(false)).withFailureHandler(error=>{button.disabled=false;alert((error&&error.message)||'Stav Roundu se nepodařilo změnit.')}).setRoundLock({formId:FORM_ID,roundId:round.roundId,unlocked:!round.unlocked});
+          google.script.run.withSuccessHandler(()=>loadSession(false)).withFailureHandler(error=>{button.disabled=false;alert((error&&error.message)||'Stav Partu se nepodařilo změnit.')}).setRoundLock({formId:FORM_ID,roundId:round.roundId,unlocked:!round.unlocked});
         };
         roundControlsEl.append(button);
       });
