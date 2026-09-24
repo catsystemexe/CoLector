@@ -10,13 +10,14 @@ const PART_LOCKING_ENABLED = false;
 
 function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
-  const published = getPublishedForm(payload.formId);
+  const central = openCentralStore_();
+  const published = formRepositoryGetPublished_(payload.formId, central);
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema);
+    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema, central);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
     return {ok:true,teamLabel:String(team.values[1] || '')};
@@ -30,7 +31,8 @@ function submitParticipantResponse(payload) {
     throw new Error('Neplatná odpověď formuláře.');
   }
 
-  const published = getPublishedForm(payload.formId);
+  const central = openCentralStore_();
+  const published = formRepositoryGetPublished_(payload.formId, central);
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
   const rounds = schemaRounds_(published.schema);
   if (!rounds.length) throw new Error('Formulář nemá žádný Part.');
@@ -38,7 +40,7 @@ function submitParticipantResponse(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema);
+    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema, central);
     const responses = target.getSheetByName('ODPOVĚDI');
     const meta = ensureMetaHeaders_(target);
     const teams = getOrCreateTeamsSheet_(target);
@@ -92,7 +94,8 @@ function submitParticipantResponse(payload) {
 
 function getParticipantRoundView(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
-  const published = getPublishedForm(payload.formId);
+  const central = openCentralStore_();
+  const published = formRepositoryGetPublished_(payload.formId, central);
   if (!published || !published.schema) return {status:'unavailable'};
 
   const rounds = schemaRounds_(published.schema);
@@ -101,7 +104,7 @@ function getParticipantRoundView(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema);
+    const target = getOrCreateFormDataSpreadsheet_(payload.formId, published.schema, central);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
     const teamLabel = String(team.values[1] || '');
@@ -199,6 +202,15 @@ function schemaRounds_(schema) {
 
 function getRoundStates_(formId, schema) {
   const rounds = schemaRounds_(schema);
+  if (!PART_LOCKING_ENABLED) {
+    return rounds.map((round,index) => ({
+      roundId:round.id,
+      number:index + 1,
+      unlocked:true,
+      lockingEnabled:false
+    }));
+  }
+
   const properties = PropertiesService.getScriptProperties();
   const key = ROUND_STATE_PREFIX + formId;
   let stored = {};
@@ -207,10 +219,8 @@ function getRoundStates_(formId, schema) {
   return rounds.map((round,index) => ({
     roundId:round.id,
     number:index + 1,
-    unlocked:PART_LOCKING_ENABLED
-      ? (typeof stored[round.id] === 'boolean' ? stored[round.id] : index === 0)
-      : true,
-    lockingEnabled:PART_LOCKING_ENABLED
+    unlocked:typeof stored[round.id] === 'boolean' ? stored[round.id] : index === 0,
+    lockingEnabled:true
   }));
 }
 
@@ -223,21 +233,13 @@ function ensureParticipantTeam_(teams, teamId) {
 }
 
 function ensureMetaHeaders_(spreadsheet) {
-  let meta = spreadsheet.getSheetByName('_META');
-  if (!meta) meta = spreadsheet.insertSheet('_META');
-  if (meta.getMaxColumns() < FORM_META_HEADERS.length) {
-    meta.insertColumnsAfter(meta.getMaxColumns(), FORM_META_HEADERS.length - meta.getMaxColumns());
-  }
-  const current = meta.getRange(1, 1, 1, FORM_META_HEADERS.length).getValues()[0].map(String);
-  const matches = FORM_META_HEADERS.every((header,index) => current[index] === header);
-  if (!matches) meta.getRange(1, 1, 1, FORM_META_HEADERS.length).setValues([FORM_META_HEADERS]);
-  meta.setFrozenRows(1);
-  return meta;
+  // Compatibility alias for mutating paths.
+  return ensureMetaStore_(spreadsheet);
 }
 
 function completedRoundIdsForTeam_(spreadsheet, teamId, rounds) {
-  const meta = ensureMetaHeaders_(spreadsheet);
-  if (meta.getLastRow() < 2) return [];
+  const meta = getMetaStore_(spreadsheet);
+  if (!meta || meta.getLastRow() < 2) return [];
   const firstRoundId = rounds[0] ? rounds[0].id : '';
   const completed = [];
   meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
@@ -249,45 +251,8 @@ function completedRoundIdsForTeam_(spreadsheet, teamId, rounds) {
 }
 
 function getOrCreatePartOpensSheet_(spreadsheet, rounds) {
-  let sheet = spreadsheet.getSheetByName(FORM_PART_OPENS_SHEET);
-  const created = !sheet;
-  if (!sheet) {
-    sheet = spreadsheet.insertSheet(FORM_PART_OPENS_SHEET);
-    sheet.getRange(1, 1, 1, FORM_PART_OPENS_HEADERS.length).setValues([FORM_PART_OPENS_HEADERS]);
-    sheet.setFrozenRows(1);
-  }
-
-  if (created) {
-    const seen = {};
-    const rows = [];
-    const firstRoundId = rounds && rounds[0] ? String(rounds[0].id) : '';
-    const teams = getOrCreateTeamsSheet_(spreadsheet);
-    if (firstRoundId && teams.getLastRow() > 1) {
-      teams.getRange(2, 1, teams.getLastRow() - 1, 3).getValues().forEach(row => {
-        const teamId = String(row[0] || '');
-        if (!teamId) return;
-        const key = teamId + '|' + firstRoundId;
-        if (seen[key]) return;
-        seen[key] = true;
-        rows.push([teamId, firstRoundId, row[2] || new Date()]);
-      });
-    }
-
-    const meta = ensureMetaHeaders_(spreadsheet);
-    if (meta.getLastRow() > 1) {
-      meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
-        const teamId = String(row[2] || '');
-        const roundId = String(row[8] || firstRoundId);
-        if (!teamId || !roundId) return;
-        const key = teamId + '|' + roundId;
-        if (seen[key]) return;
-        seen[key] = true;
-        rows.push([teamId, roundId, row[0] || new Date()]);
-      });
-    }
-    if (rows.length) sheet.getRange(2, 1, rows.length, FORM_PART_OPENS_HEADERS.length).setValues(rows);
-  }
-  return sheet;
+  // Compatibility alias for mutating paths.
+  return ensurePartOpensStore_(spreadsheet, rounds);
 }
 
 function markPartOpened_(spreadsheet, teamId, roundId, rounds) {
@@ -302,8 +267,10 @@ function markPartOpened_(spreadsheet, teamId, roundId, rounds) {
 function partDistributedCounts_(spreadsheet, rounds) {
   const counts = {};
   (rounds || []).forEach(round => counts[String(round.id)] = 0);
-  const sheet = getOrCreatePartOpensSheet_(spreadsheet, rounds);
+  const sheet = getPartOpensStore_(spreadsheet);
+  if (!sheet) return derivePartDistributedCounts_(spreadsheet, rounds, counts);
   if (sheet.getLastRow() < 2) return counts;
+
   const seen = {};
   sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().forEach(row => {
     const teamId = String(row[0] || '');
@@ -317,27 +284,48 @@ function partDistributedCounts_(spreadsheet, rounds) {
   return counts;
 }
 
+function derivePartDistributedCounts_(spreadsheet, rounds, counts) {
+  const seen = {};
+  const firstRoundId = rounds && rounds[0] ? String(rounds[0].id) : '';
+  const teams = getTeamsStore_(spreadsheet);
+  if (firstRoundId && teams && teams.getLastRow() > 1) {
+    teams.getRange(2, 1, teams.getLastRow() - 1, 3).getValues().forEach(row => {
+      const teamId = String(row[0] || '');
+      if (!teamId) return;
+      const key = teamId + '|' + firstRoundId;
+      if (seen[key]) return;
+      seen[key] = true;
+      if (Object.prototype.hasOwnProperty.call(counts, firstRoundId)) counts[firstRoundId] += 1;
+    });
+  }
+
+  const meta = getMetaStore_(spreadsheet);
+  if (meta && meta.getLastRow() > 1) {
+    meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
+      const teamId = String(row[2] || '');
+      const roundId = String(row[8] || firstRoundId);
+      if (!teamId || !roundId || !Object.prototype.hasOwnProperty.call(counts, roundId)) return;
+      const key = teamId + '|' + roundId;
+      if (seen[key]) return;
+      seen[key] = true;
+      counts[roundId] += 1;
+    });
+  }
+  return counts;
+}
+
 function getSessionView(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
-  const published = getPublishedForm(formId);
+  const central = openCentralStore_();
+  const published = formRepositoryGetPublished_(formId, central);
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
   const rounds = schemaRounds_(published.schema);
   const roundStates = getRoundStates_(formId, published.schema);
-  const central = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const registry = getOrCreateFormDataRegistry_(central);
-
-  let spreadsheetId = '';
-  let spreadsheetUrl = '';
-  if (registry.getLastRow() > 1) {
-    const rows = registry.getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues();
-    const match = rows.find(row => String(row[0]) === String(formId));
-    if (match) {
-      spreadsheetId = String(match[1] || '');
-      spreadsheetUrl = String(match[2] || '');
-    }
-  }
+  const dataRecord = getFormDataRecord_(formId, central);
+  const spreadsheetId = dataRecord ? dataRecord.spreadsheetId : '';
+  const spreadsheetUrl = dataRecord ? dataRecord.spreadsheetUrl : '';
 
   const teams = [];
   const answersByTeamRound = {};
@@ -345,11 +333,11 @@ function getSessionView(formId) {
   if (spreadsheetId) {
     try {
       const target = SpreadsheetApp.openById(spreadsheetId);
-      const teamSheet = getOrCreateTeamsSheet_(target);
+      const teamSheet = getTeamsStore_(target);
       const completedByTeam = {};
       distributedByRound = partDistributedCounts_(target, rounds);
 
-      if (teamSheet.getLastRow() > 1) {
+      if (teamSheet && teamSheet.getLastRow() > 1) {
         teamSheet.getRange(2, 1, teamSheet.getLastRow() - 1, 4).getValues().forEach(row => {
           if (!row[0]) return;
           const teamId = String(row[0]);
@@ -365,8 +353,8 @@ function getSessionView(formId) {
         });
       }
 
-      const meta = ensureMetaHeaders_(target);
-      if (meta.getLastRow() > 1) {
+      const meta = getMetaStore_(target);
+      if (meta && meta.getLastRow() > 1) {
         meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
           const teamId = String(row[2] || '');
           if (!teamId || !row[7]) return;
@@ -417,19 +405,19 @@ function getSessionView(formId) {
 }
 
 function getHomeFormSummaries() {
-  const forms = listFormDrafts();
-  const central = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const registry = getOrCreateFormDataRegistry_(central);
+  const central = openCentralStore_();
+  const forms = formRepositoryList_(central);
+  const registry = getFormDataRegistryStore_(central);
   const dataByForm = {};
-  if (registry.getLastRow() > 1) {
+  if (registry && registry.getLastRow() > 1) {
     registry.getRange(2, 1, registry.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues().forEach(row => {
       if (row[0]) dataByForm[String(row[0])] = {spreadsheetId:String(row[1] || ''), spreadsheetUrl:String(row[2] || '')};
     });
   }
 
   const schemaByForm = {};
-  const formsSheet = getOrCreateFormsSheet_(central);
-  if (formsSheet.getLastRow() > 1) {
+  const formsSheet = getFormsStore_(central);
+  if (formsSheet && formsSheet.getLastRow() > 1) {
     formsSheet.getRange(2, 1, formsSheet.getLastRow() - 1, FORMS_HEADERS.length).getValues().forEach(row => {
       if (!row[0]) return;
       let draftSchema = null;
@@ -453,8 +441,8 @@ function getHomeFormSummaries() {
     if (data && data.spreadsheetId) {
       try {
         const target = SpreadsheetApp.openById(data.spreadsheetId);
-        const teams = getOrCreateTeamsSheet_(target);
-        if (teams.getLastRow() > 1) {
+        const teams = getTeamsStore_(target);
+        if (teams && teams.getLastRow() > 1) {
           const rows = teams.getRange(2, 1, teams.getLastRow() - 1, 4).getValues();
           totalParticipants = rows.filter(row => row[0]).length;
           rows.forEach(row => { if (row[0]) completedByTeam[String(row[0])] = []; });
@@ -462,8 +450,8 @@ function getHomeFormSummaries() {
 
         if (rounds.length) {
           distributedByRound = partDistributedCounts_(target, rounds);
-          const meta = ensureMetaHeaders_(target);
-          if (meta.getLastRow() > 1) {
+          const meta = getMetaStore_(target);
+          if (meta && meta.getLastRow() > 1) {
             meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
               const teamId = String(row[2] || '');
               if (!teamId) return;
@@ -499,10 +487,11 @@ function getHomeFormSummaries() {
 function getOrCreateFormDataUrl(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
-  const source = getFormDraft(formId);
+  const central = openCentralStore_();
+  const source = formRepositoryGetDraft_(formId, central);
   if (!source || !source.schema) throw new Error('Formulář nebyl nalezen.');
 
-  const target = getOrCreateFormDataSpreadsheet_(formId, source.schema);
+  const target = getOrCreateFormDataSpreadsheet_(formId, source.schema, central);
   return {
     ok: true,
     formId: formId,
@@ -510,59 +499,32 @@ function getOrCreateFormDataUrl(formId) {
   };
 }
 
-function getOrCreateFormDataSpreadsheet_(formId, schema) {
-  const central = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const registry = getOrCreateFormDataRegistry_(central);
-  const lastRow = registry.getLastRow();
-  if (lastRow > 1) {
-    const rows = registry.getRange(2, 1, lastRow - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues();
-    const match = rows.find(row => row[0] === formId);
-    if (match && match[1]) {
-      try {
-        const existing = SpreadsheetApp.openById(match[1]);
-        getOrCreateTeamsSheet_(existing);
-        ensureMetaHeaders_(existing);
-        return existing;
-      } catch (error) {}
-    }
+function getOrCreateFormDataSpreadsheet_(formId, schema, centralStore) {
+  const central = centralStore || openCentralStore_();
+  const existing = openFormDataStore_(formId, central);
+  if (existing) {
+    ensureTeamsStore_(existing);
+    ensureMetaStore_(existing);
+    return existing;
   }
 
+  const registry = ensureFormDataRegistryStore_(central);
   const title = String(schema.internalTitle || schema.title || 'Formulář').trim() || 'Formulář';
   const spreadsheet = SpreadsheetApp.create('CoLector — ' + title);
   const first = spreadsheet.getSheets()[0];
   first.setName('ODPOVĚDI');
   first.clear();
 
-  const meta = spreadsheet.insertSheet('_META');
-  meta.getRange(1, 1, 1, FORM_META_HEADERS.length).setValues([FORM_META_HEADERS]);
-  meta.setFrozenRows(1);
-
-  getOrCreateTeamsSheet_(spreadsheet);
+  ensureMetaStore_(spreadsheet);
+  ensureTeamsStore_(spreadsheet);
   ensureResponseHeaders_(first, schema);
   registry.appendRow([formId, spreadsheet.getId(), spreadsheet.getUrl(), new Date()]);
   return spreadsheet;
 }
 
 function getOrCreateTeamsSheet_(spreadsheet) {
-  let sheet = spreadsheet.getSheetByName(FORM_TEAMS_SHEET);
-  if (!sheet) {
-    sheet = spreadsheet.insertSheet(FORM_TEAMS_SHEET);
-    sheet.getRange(1, 1, 1, FORM_TEAMS_HEADERS.length).setValues([FORM_TEAMS_HEADERS]);
-    sheet.setFrozenRows(1);
-
-    const meta = spreadsheet.getSheetByName('_META');
-    if (meta && meta.getLastRow() > 1) {
-      const rows = meta.getRange(2, 1, meta.getLastRow() - 1, Math.min(FORM_META_HEADERS.length, meta.getLastColumn())).getValues();
-      const seen = {};
-      rows.forEach(row => {
-        const teamId = String(row[2] || '');
-        if (!teamId || seen[teamId]) return;
-        seen[teamId] = true;
-        sheet.appendRow([teamId, String(row[3] || ''), row[0] || new Date(), row[0] || new Date()]);
-      });
-    }
-  }
-  return sheet;
+  // Compatibility alias for mutating paths.
+  return ensureTeamsStore_(spreadsheet);
 }
 
 function findTeamRow_(sheet, teamId) {
@@ -584,13 +546,8 @@ function nextTeamLabelFromTeams_(sheet) {
 }
 
 function getOrCreateFormDataRegistry_(spreadsheet) {
-  let sheet = spreadsheet.getSheetByName(FORM_DATA_REGISTRY_SHEET);
-  if (!sheet) {
-    sheet = spreadsheet.insertSheet(FORM_DATA_REGISTRY_SHEET);
-    sheet.getRange(1, 1, 1, FORM_DATA_REGISTRY_HEADERS.length).setValues([FORM_DATA_REGISTRY_HEADERS]);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
+  // Compatibility alias for mutating paths.
+  return ensureFormDataRegistryStore_(spreadsheet);
 }
 
 function participantFields_(schema) {
