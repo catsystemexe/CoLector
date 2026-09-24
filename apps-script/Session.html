@@ -110,7 +110,14 @@
       box-shadow:0 8px 28px rgba(26,37,62,.055);
     }
 
-    .sheet-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+    .response-view{display:grid;gap:10px}
+.response-view .sheet{touch-action:pan-y}
+.response-view .sheet.swiping{user-select:none}
+.response-browser{display:grid;grid-template-columns:46px minmax(80px,auto) 46px;justify-content:center;align-items:center;gap:8px}
+.response-nav{width:46px;height:42px;border:1px solid #dfe5ee;border-radius:12px;background:#fff;color:#59647a;font-size:27px;line-height:1;display:grid;place-items:center;cursor:pointer}
+.response-nav:disabled{opacity:.3;cursor:default}
+.response-position{text-align:center;color:#69758a;font-size:13px;font-weight:850;white-space:nowrap}
+.sheet-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
     .sheet-title{margin:0;font-size:26px;line-height:1.12;color:#27334a}
     .sheet-team{margin-top:6px;color:#279263;font-weight:750;font-size:14px}
     .instructions{margin:8px 0 0;color:#6f7a8f;line-height:1.45;white-space:pre-wrap}
@@ -466,6 +473,11 @@
       const rounds=(sessionData&&sessionData.rounds)||[];
       return rounds.find(round=>round.roundId===focusedRoundId)||rounds[0]||null;
     }
+    function eligibleTeams(){
+      const round=currentRound();
+      if(!round||!sessionData)return[];
+      return (sessionData.teams||[]).filter(team=>(team.completedRoundIds||[]).includes(round.roundId));
+    }
 
     function renderRoundControls(){
       roundControlsEl.innerHTML='';
@@ -478,7 +490,9 @@
         button.setAttribute('aria-label',button.title);
         button.innerHTML=lockSvg(round.unlocked)+'<span>'+round.number+'</span>';
         button.onclick=()=>{
+          const changedRound=focusedRoundId!==round.roundId;
           focusedRoundId=round.roundId;
+          if(changedRound)selectedTeamId='';
           renderRoundControls();renderCounts();renderSelectedTeam();
           button.disabled=true;
           google.script.run.withSuccessHandler(()=>loadSession(false)).withFailureHandler(error=>{button.disabled=false;alert((error&&error.message)||'Stav Roundu se nepodařilo změnit.')}).setRoundLock({formId:FORM_ID,roundId:round.roundId,unlocked:!round.unlocked});
@@ -511,16 +525,56 @@
       return null;
     }
 
+    function selectRelative(delta){
+      const teams=eligibleTeams();
+      if(!teams.length)return;
+      let index=teams.findIndex(team=>team.teamId===selectedTeamId);
+      if(index<0)index=0;
+      const next=Math.max(0,Math.min(teams.length-1,index+delta));
+      if(next===index)return;
+      selectedTeamId=teams[next].teamId;
+      renderSelectedTeam();
+      const main=document.querySelector('main');if(main)main.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    function installResponseSwipe(sheet){
+      let pointerId=null,startX=0,startY=0,dragging=false;
+      sheet.addEventListener('pointerdown',e=>{
+        if(e.button!=null&&e.button!==0)return;
+        pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;dragging=false;
+        sheet.setPointerCapture&&sheet.setPointerCapture(pointerId);
+      });
+      sheet.addEventListener('pointermove',e=>{
+        if(pointerId!==e.pointerId)return;
+        const dx=e.clientX-startX,dy=e.clientY-startY;
+        if(!dragging){
+          if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+          if(Math.abs(dy)>Math.abs(dx)){pointerId=null;return}
+          dragging=true;sheet.classList.add('swiping');
+        }
+        if(dragging)e.preventDefault();
+      });
+      sheet.addEventListener('pointerup',e=>{
+        if(pointerId!==e.pointerId)return;
+        const dx=e.clientX-startX;
+        sheet.classList.remove('swiping');
+        if(dragging&&Math.abs(dx)>=55)selectRelative(dx<0?1:-1);
+        pointerId=null;dragging=false;
+      });
+      sheet.addEventListener('pointercancel',()=>{sheet.classList.remove('swiping');pointerId=null;dragging=false});
+    }
+
     function renderSelectedTeam(){
       if(!sessionData)return;
       const round=currentRound();
       if(!round){contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong></div>';return}
 
-      const eligible=(sessionData.teams||[]).filter(team=>(team.completedRoundIds||[]).includes(round.roundId));
-      if(selectedTeamId&&!eligible.some(team=>team.teamId===selectedTeamId))selectedTeamId='';
-      if(!selectedTeamId&&eligible.length)selectedTeamId=eligible[0].teamId;
+      const teams=eligibleTeams();
+      if(selectedTeamId&&!teams.some(team=>team.teamId===selectedTeamId))selectedTeamId='';
+      if(!selectedTeamId&&teams.length)selectedTeamId=teams[0].teamId;
 
-      const team=(sessionData.teams||[]).find(item=>item.teamId===selectedTeamId);
+      const index=teams.findIndex(team=>team.teamId===selectedTeamId);
+      const team=index>=0?teams[index]:null;
       const response=team&&sessionData.answersByTeamRound&&sessionData.answersByTeamRound[team.teamId]?sessionData.answersByTeamRound[team.teamId][round.roundId]:null;
 
       if(!team||!response){
@@ -529,6 +583,7 @@
       }
 
       contentEl.innerHTML='';
+      const view=document.createElement('div');view.className='response-view';
       const sheet=document.createElement('section');sheet.className='sheet';
       const head=document.createElement('div');head.className='sheet-head';
       const title=document.createElement('h1');title.className='sheet-title';title.textContent=round.title||(sessionData.schema&&sessionData.schema.internalTitle)||team.teamLabel;
@@ -538,7 +593,15 @@
       sheet.appendChild(head);
       const fields=document.createElement('div');fields.className='fields';
       (round.fields||[]).forEach(field=>{const rendered=renderField(field,response.answers||{});if(rendered)fields.appendChild(rendered)});
-      sheet.appendChild(fields);contentEl.appendChild(sheet);
+      sheet.appendChild(fields);
+      installResponseSwipe(sheet);
+
+      const browser=document.createElement('div');browser.className='response-browser';
+      const prev=document.createElement('button');prev.type='button';prev.className='response-nav';prev.textContent='‹';prev.title='Předchozí participant';prev.setAttribute('aria-label',prev.title);prev.disabled=index<=0;prev.onclick=()=>selectRelative(-1);
+      const position=document.createElement('div');position.className='response-position';position.textContent=(index+1)+' / '+teams.length;
+      const next=document.createElement('button');next.type='button';next.className='response-nav';next.textContent='›';next.title='Další participant';next.setAttribute('aria-label',next.title);next.disabled=index<0||index>=teams.length-1;next.onclick=()=>selectRelative(1);
+      browser.append(prev,position,next);
+      view.append(sheet,browser);contentEl.appendChild(view);
     }
 
     function renderSession(result){
@@ -548,11 +611,12 @@
       if(!focusedRoundId||!rounds.some(round=>round.roundId===focusedRoundId)){
         const openRounds=rounds.filter(round=>round.unlocked);
         focusedRoundId=(openRounds.length?openRounds[openRounds.length-1]:rounds[0]||{}).roundId||'';
+        selectedTeamId='';
       }
-      selectedTeamId='';
       renderRoundControls();
       renderCounts();
       if((result.teams||[]).length===0){
+        selectedTeamId='';
         contentEl.innerHTML='<div class="empty"><strong>Zatím žádný participant</strong>Po otevření QR kódu se počítadlo nahoře aktualizuje.</div>';
         return;
       }
