@@ -312,6 +312,22 @@ function getFormDataRecord_(formId, central) {
   return findFormDataRecord_(getFormDataRegistryStore_(central), formId);
 }
 
+function deleteFormDataRecord_(formId, central) {
+  const sheet = getFormDataRegistryStore_(central);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, FORM_DATA_REGISTRY_HEADERS.length).getValues();
+  const index = rows.findIndex(row => String(row[0]) === String(formId));
+  if (index === -1) return null;
+  const record = {
+    formId:String(rows[index][0] || ''),
+    spreadsheetId:String(rows[index][1] || ''),
+    spreadsheetUrl:String(rows[index][2] || ''),
+    createdAt:rows[index][3] || ''
+  };
+  sheet.deleteRow(index + 2);
+  return record;
+}
+
 function openFormDataStore_(formId, central) {
   const record = getFormDataRecord_(formId, central);
   if (!record || !record.spreadsheetId) return null;
@@ -472,6 +488,16 @@ function formRuntimeRowToRecord_(row, rowIndex) {
     revision: String(row[4] || ''),
     updatedAt: row[5] ? new Date(row[5]).toISOString() : ''
   };
+}
+
+function formRuntimeRepositoryDelete_(formId, central) {
+  const sheet = getFormRuntimeStore_(central);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, FORM_RUNTIME_HEADERS.length).getValues();
+  const index = rows.findIndex(row => String(row[0]) === String(formId));
+  if (index === -1) return false;
+  sheet.deleteRow(index + 2);
+  return true;
 }
 
 function formRuntimeRepositorySave_(record, central) {
