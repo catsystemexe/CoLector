@@ -90,14 +90,24 @@
         const payload={formId:FORM_ID,teamId:teamId,roundId:roundId,responseId:makeId('response'),answers:collectAnswers()};
         google.script.run.withSuccessHandler(result=>{
           clearDraft(roundId);
-          button.textContent='Odesláno';
-          status.className='submit-state success';
-          status.textContent=(result&&result.teamLabel?result.teamLabel+': ':'')+'odpověď byla uložena.';
-          setTimeout(()=>loadView(true),650);
+          renderSubmitted(result);
         }).withFailureHandler(error=>{
           button.disabled=false;button.textContent='Odeslat';status.className='submit-state error';status.textContent=(error&&error.message)||'Odeslání se nepodařilo.';
         }).submitParticipantResponse(payload);
       };
+    }
+
+    function renderSubmitted(result){
+      currentStatus='submitted';
+      currentSchema=null;
+      currentRoundId='';
+      currentRoundNumber=0;
+      if(pollTimer){clearInterval(pollTimer);pollTimer=null}
+      const teamPrefix=result&&result.teamLabel?result.teamLabel+': ':'';
+      const complete=!!(result&&result.complete);
+      sheet.innerHTML=complete
+        ? '<div class="state"><strong>Hotovo</strong>'+teamPrefix+'odpověď byla uložena.</div>'
+        : '<div class="state"><strong>Odevzdáno</strong>'+teamPrefix+'odpověď byla uložena.<br>Pro další část znovu naskenujte QR kód.</div>';
     }
 
     function renderLocked(result){
