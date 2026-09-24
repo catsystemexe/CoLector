@@ -449,6 +449,7 @@
   <script>
     const APP_URL=<?!= JSON.stringify(appUrl) ?>;
     const FORM_ID=<?!= JSON.stringify(formId) ?>;
+    const SESSION_CACHE_KEY='colector.session.snapshot.v2.'+FORM_ID;
 
     const submittedCountEl=document.getElementById('submittedCount');
     const distributedCountEl=document.getElementById('distributedCount');
@@ -631,6 +632,21 @@
       view.append(sheet);contentEl.appendChild(view);
     }
 
+    function readSessionCache(){
+      try{
+        const raw=sessionStorage.getItem(SESSION_CACHE_KEY);
+        if(!raw)return null;
+        const parsed=JSON.parse(raw);
+        return parsed&&parsed.formId===FORM_ID?parsed:null;
+      }catch(error){return null}
+    }
+
+    function writeSessionCache(result){
+      try{
+        if(result&&result.formId===FORM_ID)sessionStorage.setItem(SESSION_CACHE_KEY,JSON.stringify(result));
+      }catch(error){}
+    }
+
     function renderSession(result){
       sessionData=result;
       sessionRevision=String((result&&result.revision)||'');
@@ -653,7 +669,14 @@
 
     function loadSession(showBusy){
       if(showBusy)showLoader('Collecting…');
-      google.script.run.withSuccessHandler(result=>{renderSession(result);if(showBusy)hideLoader()}).withFailureHandler(error=>{if(showBusy)hideLoader();contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+((error&&error.message)||'Zkuste stránku obnovit.')+'</div>'}).getSessionView(FORM_ID);
+      google.script.run.withSuccessHandler(result=>{
+        writeSessionCache(result);
+        renderSession(result);
+        if(showBusy)hideLoader();
+      }).withFailureHandler(error=>{
+        if(showBusy)hideLoader();
+        if(!sessionData)contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+((error&&error.message)||'Zkuste stránku obnovit.')+'</div>';
+      }).getSessionView(FORM_ID);
     }
 
     function pollSessionRevision(){
@@ -684,7 +707,20 @@
     document.getElementById('qrClose').onclick=()=>qrScreen.classList.remove('open');
     sheetButton.onclick=()=>{if(sessionData&&sessionData.spreadsheetUrl)window.open(sessionData.spreadsheetUrl,'_blank','noopener')};
 
-    if(!FORM_ID){hideLoader();contentEl.innerHTML='<div class="empty"><strong>Chybí formulář</strong></div>'}else{loadSession(true);setInterval(pollSessionRevision,3000)}
+    if(!FORM_ID){
+      hideLoader();
+      contentEl.innerHTML='<div class="empty"><strong>Chybí formulář</strong></div>';
+    }else{
+      const cachedSession=readSessionCache();
+      if(cachedSession){
+        renderSession(cachedSession);
+        hideLoader();
+        pollSessionRevision();
+      }else{
+        loadSession(true);
+      }
+      setInterval(pollSessionRevision,3000);
+    }
   </script>
 </body>
 </html>
