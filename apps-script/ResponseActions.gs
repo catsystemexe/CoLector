@@ -112,7 +112,7 @@ function getParticipantRoundView(payload) {
     const nextRound = rounds.find(round => !completed.includes(round.id));
 
     if (!nextRound) {
-      return {status:'complete',teamLabel:teamLabel,completedRoundIds:completed,roundCount:rounds.length};
+      return {status:'complete',teamLabel:teamLabel,completedRoundIds:completed,roundCount:rounds.length,lockingEnabled:PART_LOCKING_ENABLED};
     }
 
     const states = getRoundStates_(payload.formId, published.schema);
@@ -124,7 +124,8 @@ function getParticipantRoundView(payload) {
         roundId:nextRound.id,
         roundNumber:nextRound.number,
         roundCount:rounds.length,
-        completedRoundIds:completed
+        completedRoundIds:completed,
+        lockingEnabled:PART_LOCKING_ENABLED
       };
     }
 
@@ -137,6 +138,7 @@ function getParticipantRoundView(payload) {
       roundNumber:nextRound.number,
       roundCount:rounds.length,
       completedRoundIds:completed,
+      lockingEnabled:PART_LOCKING_ENABLED,
       schema:{
         version:3,
         formId:payload.formId,
