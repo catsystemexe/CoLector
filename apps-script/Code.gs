@@ -220,6 +220,11 @@ function getEditorRouteBootstrap_() {
       setSaveStatus(cachedRecord?'Ověřuji…':'Načítám…','saving',cachedRecord?'Ověřuji lokální draft se serverem':'Načítám formulář');
       google.script.run.withSuccessHandler(function(result){
         if(!result||!result.schema){setSaveStatus('Nenalezeno','error','Formulář nebyl nalezen');return}
+        if(result.distributed){
+          alert('Formulář už byl rozdán účastníkům. Úpravy jsou uzamčené; otevírám Session.');
+          window.top.location.href=APP_URL+'?view=session&form='+encodeURIComponent(params.form);
+          return;
+        }
         publishedSnapshot=result.publishedSchema||null;
         const serverUpdatedAt=Date.parse(result.updatedAt||'')||0;
         const latestLocal=readFormCacheRecord(params.form);
@@ -251,7 +256,11 @@ function saveFormDraft(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    return formRepositorySaveDraft_(payload, openCentralStore_());
+    const central = openCentralStore_();
+    if (formRepositoryIsDistributed_(payload.formId, central)) {
+      throw new Error('Formulář už byl rozdán účastníkům a nelze jej dále upravovat.');
+    }
+    return formRepositorySaveDraft_(payload, central);
   } finally {
     lock.releaseLock();
     perfEnd_(perf, {formId:payload.formId});
@@ -264,7 +273,11 @@ function publishFormDraft(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const result = formRepositoryPublish_(payload, openCentralStore_());
+    const central = openCentralStore_();
+    if (formRepositoryIsDistributed_(payload.formId, central)) {
+      throw new Error('Formulář už byl rozdán účastníkům a nelze jej znovu publikovat se změnami.');
+    }
+    const result = formRepositoryPublish_(payload, central);
     if (typeof bumpSessionRevision_ === 'function') bumpSessionRevision_(payload.formId);
     return result;
   } finally {
@@ -275,7 +288,12 @@ function publishFormDraft(payload) {
 
 function getFormDraft(formId) {
   if (!formId) throw new Error('Chybí form_id.');
-  return formRepositoryGetDraft_(formId, openCentralStore_());
+  const central = openCentralStore_();
+  const result = formRepositoryGetDraft_(formId, central);
+  if (!result) return null;
+  result.distributed = formRepositoryIsDistributed_(formId, central);
+  result.editable = !result.distributed;
+  return result;
 }
 
 function getPublishedForm(formId) {
