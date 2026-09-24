@@ -8,6 +8,7 @@ const FORM_PART_OPENS_SHEET = '_PART_OPENS';
 const FORM_PART_OPENS_HEADERS = ['team_id', 'round_id', 'opened_at'];
 const FORM_RUNTIME_SHEET = 'FORM_RUNTIME';
 const FORM_RUNTIME_HEADERS = ['form_id', 'total_participants', 'collected_count', 'round_stats_json', 'revision', 'updated_at'];
+const SESSION_REVISION_PREFIX = 'colector.session.revision.';
 const PART_LOCKING_ENABLED = false;
 
 function registerParticipantOpen(payload) {
@@ -198,6 +199,22 @@ function setRoundLock(payload) {
   properties.setProperty(key, JSON.stringify(values));
 
   return {ok:true,rounds:getRoundStates_(payload.formId, published.schema)};
+}
+
+function getSessionRevisionToken_(formId) {
+  if (!formId) return '';
+  return String(PropertiesService.getScriptProperties().getProperty(SESSION_REVISION_PREFIX + formId) || '');
+}
+
+function bumpSessionRevision_(formId) {
+  const revision = Utilities.getUuid();
+  PropertiesService.getScriptProperties().setProperty(SESSION_REVISION_PREFIX + formId, revision);
+  return revision;
+}
+
+function getSessionRevision(formId) {
+  if (!formId) throw new Error('Chybí form_id.');
+  return {formId:formId, revision:getSessionRevisionToken_(formId)};
 }
 
 function schemaRounds_(schema) {
@@ -427,7 +444,7 @@ function applyRuntimeDelta_(central, formId, rounds, delta) {
     runtime.roundStats[String(delta.submittedRoundId)] = stats;
   }
 
-  runtime.revision = Utilities.getUuid();
+  runtime.revision = bumpSessionRevision_(formId);
   return formRuntimeRepositorySave_(runtime, central);
 }
 
@@ -517,7 +534,8 @@ function getSessionView(formId) {
     rounds:roundViews,
     teams:teams,
     answersByTeamRound:answersByTeamRound,
-    spreadsheetUrl:spreadsheetUrl
+    spreadsheetUrl:spreadsheetUrl,
+    revision:getSessionRevisionToken_(formId)
   };
 }
 
