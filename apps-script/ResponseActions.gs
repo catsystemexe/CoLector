@@ -207,6 +207,7 @@ function setRoundLock(payload) {
   try { values = JSON.parse(properties.getProperty(key) || '{}'); } catch (error) { values = {}; }
   values[String(payload.roundId)] = payload.unlocked;
   properties.setProperty(key, JSON.stringify(values));
+  bumpSessionRevision_(payload.formId);
 
   return {ok:true,rounds:getRoundStates_(payload.formId, published.schema)};
 }
