@@ -347,13 +347,22 @@ function getHomeFormSummaries() {
     });
   }
 
+  const publishedByForm = {};
+  const formsSheet = getOrCreateFormsSheet_(central);
+  if (formsSheet.getLastRow() > 1) {
+    formsSheet.getRange(2, 1, formsSheet.getLastRow() - 1, FORMS_HEADERS.length).getValues().forEach(row => {
+      if (!row[0] || !row[7]) return;
+      try {
+        publishedByForm[String(row[0])] = {schema:JSON.parse(String(row[7])), publishedAt:toIso_(row[8])};
+      } catch (error) {}
+    });
+  }
+
   return forms.map(form => {
     const data = dataByForm[form.formId] || null;
+    const published = publishedByForm[form.formId] || null;
     let distributed = 0;
     let collected = 0;
-    let published = null;
-    try { published = getPublishedForm(form.formId); } catch (error) {}
-
     const rounds = published && published.schema ? schemaRounds_(published.schema) : [];
     const completedByTeam = {};
 
