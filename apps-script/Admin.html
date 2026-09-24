@@ -307,7 +307,7 @@ function setSaveStatus(text,mode,title){
   saveStatusEl.classList.toggle('error',mode==='error');
   saveStatusEl.title=title||text;
 }
-function scheduleSave(){clearTimeout(saveTimer);const generation=++saveGeneration;setSaveStatus('Ukládám…','saving','Ukládám draft');saveTimer=setTimeout(()=>persistDraft(generation),700)}
+function scheduleSave(){clearTimeout(saveTimer);const generation=++saveGeneration;setSaveStatus('Ukládám…','saving','Ukládám draft');saveTimer=setTimeout(()=>persistDraft(generation),1800)}
 function persistDraft(generation){
   const schema=buildSchema();
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(schema))}catch(e){if(generation===saveGeneration)setSaveStatus('Chyba','error','Draft se nepodařilo uložit ani lokálně');return}
