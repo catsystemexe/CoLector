@@ -32,7 +32,7 @@ function submitParticipantResponse(payload) {
   const published = getPublishedForm(payload.formId);
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
   const rounds = schemaRounds_(published.schema);
-  if (!rounds.length) throw new Error('Formulář nemá žádný Round.');
+  if (!rounds.length) throw new Error('Formulář nemá žádný Part.');
 
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
