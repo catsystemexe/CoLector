@@ -144,6 +144,18 @@ function getParticipantRoundView(payload) {
   }
 }
 
+function getRoundLockState(payload) {
+  if (!payload || !payload.formId || !payload.roundId) throw new Error('Neplatný dotaz na Round.');
+  const properties = PropertiesService.getScriptProperties();
+  const key = ROUND_STATE_PREFIX + payload.formId;
+  let values = {};
+  try { values = JSON.parse(properties.getProperty(key) || '{}'); } catch (error) { values = {}; }
+  const unlocked = typeof values[String(payload.roundId)] === 'boolean'
+    ? values[String(payload.roundId)]
+    : Number(payload.roundNumber || 0) === 1;
+  return {ok:true,roundId:String(payload.roundId),unlocked:unlocked};
+}
+
 function setRoundLock(payload) {
   if (!payload || !payload.formId || !payload.roundId || typeof payload.unlocked !== 'boolean') {
     throw new Error('Neplatná změna Roundu.');
@@ -207,7 +219,9 @@ function ensureMetaHeaders_(spreadsheet) {
   if (meta.getMaxColumns() < FORM_META_HEADERS.length) {
     meta.insertColumnsAfter(meta.getMaxColumns(), FORM_META_HEADERS.length - meta.getMaxColumns());
   }
-  meta.getRange(1, 1, 1, FORM_META_HEADERS.length).setValues([FORM_META_HEADERS]);
+  const current = meta.getRange(1, 1, 1, FORM_META_HEADERS.length).getValues()[0].map(String);
+  const matches = FORM_META_HEADERS.every((header,index) => current[index] === header);
+  if (!matches) meta.getRange(1, 1, 1, FORM_META_HEADERS.length).setValues([FORM_META_HEADERS]);
   meta.setFrozenRows(1);
   return meta;
 }
@@ -413,7 +427,6 @@ function getOrCreateFormDataSpreadsheet_(formId, schema) {
         const existing = SpreadsheetApp.openById(match[1]);
         getOrCreateTeamsSheet_(existing);
         ensureMetaHeaders_(existing);
-        ensureResponseHeaders_(existing.getSheetByName('ODPOVĚDI'), schema);
         return existing;
       } catch (error) {}
     }
@@ -507,7 +520,9 @@ function ensureResponseHeaders_(sheet, schema) {
   const headers = ['Tým'].concat(fields.map(field => field._columnLabel));
   const width = Math.max(1, headers.length);
   if (sheet.getMaxColumns() < width) sheet.insertColumnsAfter(sheet.getMaxColumns(), width - sheet.getMaxColumns());
-  sheet.getRange(1, 1, 1, width).setValues([headers]);
+  const current = sheet.getRange(1, 1, 1, width).getValues()[0].map(String);
+  const matches = headers.every((header,index) => current[index] === header);
+  if (!matches) sheet.getRange(1, 1, 1, width).setValues([headers]);
   sheet.setFrozenRows(1);
 }
 
