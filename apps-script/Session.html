@@ -33,7 +33,7 @@
       right:0;
       height:var(--header);
       display:grid;
-      grid-template-columns:auto auto minmax(0,1fr);
+      grid-template-columns:auto auto auto minmax(0,1fr);
       justify-content:start;
       align-items:center;
       gap:10px;
@@ -110,11 +110,11 @@
       box-shadow:0 8px 28px rgba(26,37,62,.055);
     }
 
-    .response-view{display:grid;gap:10px}
+    .response-view{display:grid}
 .response-view .sheet{touch-action:pan-y}
 .response-view .sheet.swiping{user-select:none}
-.response-browser{display:grid;grid-template-columns:46px minmax(80px,auto) 46px;justify-content:center;align-items:center;gap:8px}
-.response-nav{width:46px;height:42px;border:1px solid #dfe5ee;border-radius:12px;background:#fff;color:#59647a;font-size:27px;line-height:1;display:grid;place-items:center;cursor:pointer}
+.response-browser{display:grid;grid-template-columns:34px minmax(44px,auto) 34px;align-items:center;gap:4px;white-space:nowrap}
+.response-nav{width:34px;height:34px;border:1px solid #dfe5ee;border-radius:10px;background:#fff;color:#59647a;font-size:23px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
 .response-nav:disabled{opacity:.3;cursor:default}
 .response-position{text-align:center;color:#69758a;font-size:13px;font-weight:850;white-space:nowrap}
 .sheet-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
@@ -321,11 +321,15 @@
 
     @media(max-width:620px){
       :root{--header:86px;--bottom:108px}
-      .session-header{padding:5px 7px;gap:7px}
-      .brand-mark{width:42px;height:42px}
-      .section-name{font-size:14px}
-      .session-count .submitted-count,.session-count .distributed-count{font-size:22px}
-      .session-count .count-sep{font-size:16px}
+      .session-header{padding:5px 7px;gap:6px}
+      .brand-mark{width:40px;height:40px}
+      .section-name{font-size:13px}
+      .session-count .submitted-count,.session-count .distributed-count{font-size:21px}
+      .session-count .count-sep{font-size:15px}
+      .response-browser{grid-template-columns:30px minmax(38px,auto) 30px;gap:2px}
+      .response-nav{width:30px;height:30px;border-radius:9px;font-size:21px}
+      .response-position{font-size:12px}
+      .round-lock{height:34px;min-width:42px;padding:0 7px}
       main{padding:10px 8px 20px}
       .bottom-dock{border-radius:19px;padding-left:8px;padding-right:8px}
       .dock-action{min-height:62px;font-size:12px}
@@ -334,11 +338,16 @@
     }
 
     @media(max-width:420px){
-      .brand{gap:4px}
-      .brand-mark{width:39px;height:39px}
-      .section-name{font-size:13px}
-      .session-count .submitted-count,.session-count .distributed-count{font-size:21px}
-      .session-count .count-sep{font-size:15px}
+      .brand{gap:3px}
+      .brand-mark{width:36px;height:36px}
+      .section-name{font-size:12px}
+      .session-count .submitted-count,.session-count .distributed-count{font-size:19px}
+      .session-count .count-sep{font-size:14px}
+      .response-browser{grid-template-columns:27px minmax(34px,auto) 27px}
+      .response-nav{width:27px;height:28px;font-size:19px}
+      .response-position{font-size:11px}
+      .round-lock{height:31px;min-width:38px;padding:0 6px}
+      .round-lock svg{width:15px;height:15px}
     }
 
     @media(prefers-reduced-motion:reduce){
@@ -379,6 +388,13 @@
       <span class="count-sep">/</span>
       <span id="distributedCount" class="distributed-count">0</span>
     </div>
+
+    <div id="responseBrowser" class="response-browser" aria-label="Procházení odpovědí participantů">
+      <button id="prevResponse" class="response-nav" type="button" aria-label="Předchozí participant" title="Předchozí participant" disabled>‹</button>
+      <div id="responsePosition" class="response-position">0 / 0</div>
+      <button id="nextResponse" class="response-nav" type="button" aria-label="Další participant" title="Další participant" disabled>›</button>
+    </div>
+
     <div id="roundControls" class="round-controls" aria-label="Roundy"></div>
 
   </header>
@@ -437,6 +453,9 @@
     const submittedCountEl=document.getElementById('submittedCount');
     const distributedCountEl=document.getElementById('distributedCount');
     const roundControlsEl=document.getElementById('roundControls');
+    const prevResponseEl=document.getElementById('prevResponse');
+    const nextResponseEl=document.getElementById('nextResponse');
+    const responsePositionEl=document.getElementById('responsePosition');
     const contentEl=document.getElementById('content');
     const qrScreen=document.getElementById('qrScreen');
     const qrBox=document.getElementById('qrBox');
@@ -525,6 +544,15 @@
       return null;
     }
 
+    function renderResponseBrowser(){
+      const teams=eligibleTeams();
+      let index=teams.findIndex(team=>team.teamId===selectedTeamId);
+      if(index<0&&teams.length)index=0;
+      responsePositionEl.textContent=teams.length?((index+1)+' / '+teams.length):'0 / 0';
+      prevResponseEl.disabled=index<=0;
+      nextResponseEl.disabled=index<0||index>=teams.length-1;
+    }
+
     function selectRelative(delta){
       const teams=eligibleTeams();
       if(!teams.length)return;
@@ -567,7 +595,7 @@
     function renderSelectedTeam(){
       if(!sessionData)return;
       const round=currentRound();
-      if(!round){contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong></div>';return}
+      if(!round){renderResponseBrowser();contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong></div>';return}
 
       const teams=eligibleTeams();
       if(selectedTeamId&&!teams.some(team=>team.teamId===selectedTeamId))selectedTeamId='';
@@ -576,6 +604,8 @@
       const index=teams.findIndex(team=>team.teamId===selectedTeamId);
       const team=index>=0?teams[index]:null;
       const response=team&&sessionData.answersByTeamRound&&sessionData.answersByTeamRound[team.teamId]?sessionData.answersByTeamRound[team.teamId][round.roundId]:null;
+
+      renderResponseBrowser();
 
       if(!team||!response){
         contentEl.innerHTML='<div class="empty"><strong>Round '+round.number+' čeká na odevzdání</strong>'+(round.unlocked?'Participantům je Round otevřený.':'Round je momentálně zamčený.')+'</div>';
@@ -596,12 +626,7 @@
       sheet.appendChild(fields);
       installResponseSwipe(sheet);
 
-      const browser=document.createElement('div');browser.className='response-browser';
-      const prev=document.createElement('button');prev.type='button';prev.className='response-nav';prev.textContent='‹';prev.title='Předchozí participant';prev.setAttribute('aria-label',prev.title);prev.disabled=index<=0;prev.onclick=()=>selectRelative(-1);
-      const position=document.createElement('div');position.className='response-position';position.textContent=(index+1)+' / '+teams.length;
-      const next=document.createElement('button');next.type='button';next.className='response-nav';next.textContent='›';next.title='Další participant';next.setAttribute('aria-label',next.title);next.disabled=index<0||index>=teams.length-1;next.onclick=()=>selectRelative(1);
-      browser.append(prev,position,next);
-      view.append(sheet,browser);contentEl.appendChild(view);
+      view.append(sheet);contentEl.appendChild(view);
     }
 
     function renderSession(result){
@@ -617,6 +642,7 @@
       renderCounts();
       if((result.teams||[]).length===0){
         selectedTeamId='';
+        renderResponseBrowser();
         contentEl.innerHTML='<div class="empty"><strong>Zatím žádný participant</strong>Po otevření QR kódu se počítadlo nahoře aktualizuje.</div>';
         return;
       }
@@ -642,6 +668,8 @@
 
     document.getElementById('homeBrand').onclick=goHome;
     document.getElementById('homeBrand').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}};
+    prevResponseEl.onclick=()=>selectRelative(-1);
+    nextResponseEl.onclick=()=>selectRelative(1);
     document.getElementById('qrButton').onclick=showQr;
     document.getElementById('qrClose').onclick=()=>qrScreen.classList.remove('open');
     sheetButton.onclick=()=>{if(sessionData&&sessionData.spreadsheetUrl)window.open(sessionData.spreadsheetUrl,'_blank','noopener')};
