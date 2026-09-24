@@ -180,10 +180,31 @@
   }
 }
 </style>
+
+<style>
+.rounds-root{display:grid;gap:28px}
+.round-editor{position:relative}
+.round-label{display:inline-flex;align-items:center;min-height:26px;margin-bottom:18px;padding:4px 9px;border-radius:999px;background:#edf7f8;color:#087f8d;font-size:11px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}
+.round-delete{position:absolute;top:14px;right:16px;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:#c54c56;display:grid;place-items:center}
+.round-delete:hover{background:#fff0f1}
+.round-delete svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9}
+.round-fields{display:grid;gap:18px}
+.add-menu-divider{height:1px;background:#e7ebf1;margin:6px 4px}
+.add-option.round-option{font-weight:800;color:#087f8d}
+.compat-input{display:none!important}
+.preview-round-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 18px}
+.preview-round-tab{border:1px solid #dfe5ee;border-radius:999px;background:#fff;color:#667187;padding:7px 11px;font-weight:800;font-size:12px}
+.preview-round-tab.active{background:#e8f8f8;border-color:#bce5e5;color:#087f8d}
+@media(max-width:760px){
+  .rounds-root{gap:18px}
+  .round-label{margin-bottom:14px}
+  .round-delete{top:9px;right:9px}
+}
+</style>
 </head>
 <body>
 <header class="app-header"><div class="brand-wrap"><div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 256 256"><defs><linearGradient id="colectorEditorGradient" x1="20%" y1="10%" x2="85%" y2="90%"><stop offset="0%" stop-color="#12B8B5"/><stop offset="52%" stop-color="#069EAE"/><stop offset="100%" stop-color="#087CA8"/></linearGradient></defs><rect x="16" y="16" width="224" height="224" rx="48" fill="url(#colectorEditorGradient)"/><path d="M128 69 L180 99 Q186 103 180 107 L128 137 L76 107 Q70 103 76 99 Z" fill="#fff"/><path d="M78 126 L128 155 L178 126 L178 140 L128 169 L78 140 Z" fill="#fff"/><path d="M78 151 L128 180 L178 151 L178 165 L128 194 L78 165 Z" fill="#fff"/></svg></div><div><span class="section-name">/ Editor</span></div></div><div class="editor-header-meta"><div id="saveStatus" class="save-status" title="Draft uložen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg><span>Uloženo</span></div><input id="internalTitle" class="internal-title" value="Nový formulář" aria-label="Interní název formuláře"></div><div class="header-actions"></div></header>
-<main><section class="editor-canvas"><input id="formTitle" class="editable-title" type="text" placeholder="Nadpis formuláře"><textarea id="formInstructions" class="editable-instructions" rows="1" placeholder="Klikněte a napište instrukci"></textarea><div id="fields" class="fields"></div><div class="add-wrap"><button id="addButton" class="add-button" type="button">+</button><div id="addMenu" class="add-menu"><button class="add-option" data-type="textarea">Textové pole</button><button class="add-option" data-type="checkbox">Checkbox</button><button class="add-option" data-type="yes_no">Ano / Ne</button></div></div></section></main>
+<main><div id="roundsRoot" class="rounds-root"></div><input id="formTitle" class="compat-input" type="text" aria-hidden="true"><textarea id="formInstructions" class="compat-input" aria-hidden="true"></textarea></main>
 <nav class="editor-bottom-bar publish-pending" aria-label="Akce formuláře">
   <button id="previewButton" class="bottom-action" type="button">
     <span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.7"/></svg></span>
@@ -206,31 +227,215 @@
 </nav>
 <div id="backdrop" class="backdrop"></div><aside id="previewDrawer" class="preview-drawer" aria-hidden="true"><div class="preview-head"><strong>Preview formuláře</strong><button id="closePreview" class="icon-btn">✕</button></div><div id="previewContent" class="preview-content"></div><div class="preview-footer"><button class="submit-preview">Odeslat</button><button class="qr-preview" disabled>▦</button></div></aside>
 <script>
-const STORAGE_KEY='colector.editor.draft.v2';
-const state=loadDraft()||{version:2,formId:createId('form'),internalTitle:'Nový formulář',title:'',instructions:'',fields:[{id:createId('field'),type:'textarea',label:'',required:false,height:115,accent:'blue'}]};
+const STORAGE_KEY='colector.editor.draft.v3';
+const LEGACY_STORAGE_KEY='colector.editor.draft.v2';
+const state=loadDraft()||{version:3,formId:createId('form'),internalTitle:'Nový formulář',rounds:[createRound(true)]};
 if(!state.formId)state.formId=createId('form');
-const fieldsEl=document.getElementById('fields'),internalTitleEl=document.getElementById('internalTitle'),titleEl=document.getElementById('formTitle'),instructionsEl=document.getElementById('formInstructions'),saveStatusEl=document.getElementById('saveStatus'),addButton=document.getElementById('addButton'),addMenu=document.getElementById('addMenu'),previewDrawer=document.getElementById('previewDrawer'),previewContent=document.getElementById('previewContent'),backdrop=document.getElementById('backdrop');let saveTimer=null,draggedId=null,saveGeneration=0;
-internalTitleEl.value=state.internalTitle||'Nový formulář';titleEl.value=state.title||'';instructionsEl.value=state.instructions||'';normalizeLoadedState();autoSizeInstructions();
+
+const roundsRoot=document.getElementById('roundsRoot');
+const internalTitleEl=document.getElementById('internalTitle');
+const titleEl=document.getElementById('formTitle');
+const instructionsEl=document.getElementById('formInstructions');
+const saveStatusEl=document.getElementById('saveStatus');
+const previewDrawer=document.getElementById('previewDrawer');
+const previewContent=document.getElementById('previewContent');
+const backdrop=document.getElementById('backdrop');
+let saveTimer=null,draggedField=null,saveGeneration=0,previewRoundIndex=0;
+
 function createId(prefix){return prefix+'_'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+Math.random().toString(36).slice(2))}
-function loadDraft(){try{const raw=localStorage.getItem(STORAGE_KEY);return raw?JSON.parse(raw):null}catch(e){return null}}
-function normalizeLoadedState(){const allowed=['blue','green','purple','orange','red'];state.fields=(state.fields||[]).map(f=>{if(!allowed.includes(f.accent))f.accent='blue';if(f.type==='checkbox'){f.columns=[1,2,3].includes(Number(f.columns))?Number(f.columns):1;f.options=Array.isArray(f.options)&&f.options.length?f.options:[{id:createId('opt'),label:'Možnost 1'},{id:createId('opt'),label:'Možnost 2'}]}return f})}
-function setSaveStatus(text,mode,title){saveStatusEl.querySelector('span').textContent=text;saveStatusEl.classList.toggle('saved',mode==='cloud');saveStatusEl.classList.toggle('saving',mode==='saving');saveStatusEl.classList.toggle('local-only',mode==='local');saveStatusEl.classList.toggle('error',mode==='error');saveStatusEl.title=title||text}
+function createField(type='textarea'){const field={id:createId('field'),type:type,label:'',required:false,height:115,accent:'blue'};if(type==='checkbox')field.options=[{id:createId('opt'),label:'Možnost 1'},{id:createId('opt'),label:'Možnost 2'}];return field}
+function createRound(first){return{id:first?'round_1':createId('round'),title:'',instructions:'',fields:[createField('textarea')]}}
+function loadDraft(){try{const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem(LEGACY_STORAGE_KEY);return raw?JSON.parse(raw):null}catch(e){return null}}
+
+function normalizeField(field){
+  field=field||createField('textarea');
+  if(!field.id)field.id=createId('field');
+  if(!['textarea','checkbox','yes_no'].includes(field.type))field.type='textarea';
+  if(!['blue','green','purple','orange','red'].includes(field.accent))field.accent='blue';
+  if(field.type==='checkbox'){
+    field.columns=[1,2,3].includes(Number(field.columns))?Number(field.columns):1;
+    field.options=Array.isArray(field.options)&&field.options.length?field.options:[{id:createId('opt'),label:'Možnost 1'},{id:createId('opt'),label:'Možnost 2'}];
+    field.options=field.options.map(option=>({id:option.id||createId('opt'),label:String(option.label||'')}));
+  }
+  return field;
+}
+
+function normalizeLoadedState(){
+  const source=Array.isArray(state.rounds)&&state.rounds.length
+    ? state.rounds
+    : [{id:'round_1',title:state.title||'',instructions:state.instructions||'',fields:Array.isArray(state.fields)?state.fields:[]}];
+  state.version=3;
+  state.internalTitle=state.internalTitle||'Nový formulář';
+  state.rounds=source.map((round,index)=>({
+    id:String(round.id||(index===0?'round_1':createId('round'))),
+    title:String(round.title||''),
+    instructions:String(round.instructions||''),
+    fields:(Array.isArray(round.fields)?round.fields:[]).map(normalizeField)
+  }));
+  if(!state.rounds.length)state.rounds=[createRound(true)];
+  syncLegacyAliases();
+}
+
+function syncLegacyAliases(){
+  const first=state.rounds[0]||createRound(true);
+  state.title=first.title||'';
+  state.instructions=first.instructions||'';
+  state.fields=first.fields||[];
+  titleEl.value=state.title;
+  instructionsEl.value=state.instructions;
+}
+
+function cloneField(field){const copy={...field};if(field.options)copy.options=field.options.map(option=>({...option}));return copy}
+function buildSchema(){
+  syncLegacyAliases();
+  return{
+    version:3,
+    formId:state.formId,
+    internalTitle:state.internalTitle,
+    title:state.title,
+    instructions:state.instructions,
+    fields:state.fields.map(cloneField),
+    rounds:state.rounds.map(round=>({id:round.id,title:round.title,instructions:round.instructions,fields:(round.fields||[]).map(cloneField)}))
+  };
+}
+
+function setSaveStatus(text,mode,title){
+  saveStatusEl.querySelector('span').textContent=text;
+  saveStatusEl.classList.toggle('saved',mode==='cloud');
+  saveStatusEl.classList.toggle('saving',mode==='saving');
+  saveStatusEl.classList.toggle('local-only',mode==='local');
+  saveStatusEl.classList.toggle('error',mode==='error');
+  saveStatusEl.title=title||text;
+}
 function scheduleSave(){clearTimeout(saveTimer);const generation=++saveGeneration;setSaveStatus('Ukládám…','saving','Ukládám draft');saveTimer=setTimeout(()=>persistDraft(generation),700)}
-function persistDraft(generation){const schema=buildSchema();try{localStorage.setItem(STORAGE_KEY,JSON.stringify(schema))}catch(e){if(generation===saveGeneration)setSaveStatus('Chyba','error','Draft se nepodařilo uložit ani lokálně');return}if(!(window.google&&google.script&&google.script.run)){if(generation===saveGeneration)setSaveStatus('Lokálně','local','Draft je uložen pouze v tomto prohlížeči');return}google.script.run.withSuccessHandler(result=>{if(generation!==saveGeneration)return;if(result&&result.ok)setSaveStatus('Uloženo','cloud','Draft uložen do Google Sheets');else setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud nepotvrdil uložení')}).withFailureHandler(error=>{console.warn('Cloud autosave selhal.',error);if(generation===saveGeneration)setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud autosave selhal')}).saveFormDraft({formId:state.formId,schema})}
-function buildSchema(){return{version:2,formId:state.formId,internalTitle:state.internalTitle,title:state.title,instructions:state.instructions,fields:state.fields.map(f=>({...f,options:f.options?f.options.map(o=>({...o})):undefined}))}}
+function persistDraft(generation){
+  const schema=buildSchema();
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(schema))}catch(e){if(generation===saveGeneration)setSaveStatus('Chyba','error','Draft se nepodařilo uložit ani lokálně');return}
+  if(!(window.google&&google.script&&google.script.run)){if(generation===saveGeneration)setSaveStatus('Lokálně','local','Draft je uložen pouze v tomto prohlížeči');return}
+  google.script.run.withSuccessHandler(result=>{
+    if(generation!==saveGeneration)return;
+    if(result&&result.ok)setSaveStatus('Uloženo','cloud','Draft uložen do Google Sheets');
+    else setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud nepotvrdil uložení');
+  }).withFailureHandler(error=>{
+    console.warn('Cloud autosave selhal.',error);
+    if(generation===saveGeneration)setSaveStatus('Lokálně','local','Lokální kopie je uložená, cloud autosave selhal');
+  }).saveFormDraft({formId:state.formId,schema});
+}
+
 function accentColor(n){return({blue:'#7f96d9',green:'#79ad8d',purple:'#a38bc8',orange:'#d5a26e',red:'#d18b91'})[n]||'#7f96d9'}
 function fieldBackground(n){return({blue:'#eef3ff',green:'#edf8f0',purple:'#f4effb',orange:'#fff4e8',red:'#fceff1'})[n]||'#eef3ff'}
 function iconButton(title,html,handler,danger=false){const b=document.createElement('button');b.className='icon-btn'+(danger?' danger':'');b.type='button';b.title=title;b.innerHTML=html;b.onclick=handler;return b}
-function renderEditor(){fieldsEl.innerHTML='';state.fields.forEach(field=>{const card=document.createElement('article');card.className='field-card';card.dataset.id=field.id;card.draggable=true;card.style.setProperty('--field-accent',accentColor(field.accent));card.style.background=fieldBackground(field.accent);const head=document.createElement('div');head.className='field-head';const title=document.createElement('input');title.className='field-title';title.placeholder='Nadpis';title.value=field.label||'';title.oninput=()=>{field.label=title.value;scheduleSave();renderPreview()};const actions=document.createElement('div');actions.className='field-mini-actions';actions.append(iconButton('Barva','<span class="accent-dot"></span>',()=>cycleAccent(field)),iconButton('Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>',()=>deleteField(field.id),true));head.append(title,actions);const body=document.createElement('div');body.className='field-body';if(field.type==='textarea')renderTextarea(field,body);else if(field.type==='checkbox')renderCheckboxEditor(field,body);else renderYesNo(body);const drag=document.createElement('button');drag.className='drag-handle';drag.type='button';drag.innerHTML='<span class="drag-dots"></span>';drag.title='Přesunout položku';card.addEventListener('dragstart',e=>{if(!e.target.closest('.drag-handle')){e.preventDefault();return}draggedId=field.id;card.classList.add('dragging');e.dataTransfer.setData('text/plain',field.id)});card.addEventListener('dragend',()=>{draggedId=null;card.classList.remove('dragging');document.querySelectorAll('.field-card').forEach(el=>el.classList.remove('drag-over'))});card.addEventListener('dragover',e=>{if(!draggedId||draggedId===field.id)return;e.preventDefault();card.classList.add('drag-over')});card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));card.addEventListener('drop',e=>{e.preventDefault();reorderFields(draggedId,field.id)});card.append(head,body,drag);fieldsEl.append(card)})}
-function renderTextarea(field,body){const ta=document.createElement('textarea');ta.placeholder='Text';ta.style.height=Math.max(80,Number(field.height)||115)+'px';const remember=()=>{field.height=Math.min(500,Math.max(80,Math.round(ta.getBoundingClientRect().height)));scheduleSave();renderPreview()};ta.onmouseup=remember;ta.ontouchend=remember;body.append(ta)}
-function renderCheckboxEditor(field,body){const toolbar=document.createElement('div');toolbar.className='checkbox-toolbar';toolbar.append(document.createTextNode('Na řádek:'));const seg=document.createElement('div');seg.className='segmented';[1,2,3].forEach(n=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.className=Number(field.columns)===n?'active':'';b.onclick=()=>{field.columns=n;scheduleSave();renderEditor();renderPreview()};seg.append(b)});toolbar.append(seg);const grid=document.createElement('div');grid.className='checkbox-grid';grid.style.gridTemplateColumns=`repeat(${field.columns||1},minmax(0,1fr))`;field.options.forEach(opt=>{const item=document.createElement('div');item.className='check-item';const box=document.createElement('input');box.type='checkbox';box.disabled=true;const input=document.createElement('input');input.className='option-label';input.value=opt.label||'';input.placeholder='Text';input.oninput=()=>{opt.label=input.value;scheduleSave();renderPreview()};const del=document.createElement('button');del.type='button';del.className='option-delete';del.textContent='×';del.title='Smazat možnost';del.onclick=()=>{field.options=field.options.filter(o=>o.id!==opt.id);scheduleSave();renderEditor();renderPreview()};item.append(box,input,del);grid.append(item)});const add=document.createElement('button');add.type='button';add.className='add-option-inline';add.textContent='+ Přidat možnost';add.onclick=()=>{field.options.push({id:createId('opt'),label:'Nová možnost'});scheduleSave();renderEditor();renderPreview()};body.append(toolbar,grid,add)}
-function renderYesNo(body){const row=document.createElement('div');row.className='yesno-row';['Ano','Ne'].forEach(t=>{const b=document.createElement('button');b.type='button';b.className='yesno-choice';b.textContent='○  '+t;b.disabled=true;row.append(b)});body.append(row)}
-function cycleAccent(field){const p=['blue','green','purple','orange','red'];field.accent=p[(p.indexOf(field.accent)+1+p.length)%p.length];scheduleSave();renderEditor();renderPreview()}
-function deleteField(id){const f=state.fields.find(x=>x.id===id),label=f&&f.label?' „'+f.label+'“':'';if(!confirm('Opravdu chcete smazat tuto položku'+label+'?'))return;state.fields=state.fields.filter(x=>x.id!==id);scheduleSave();renderEditor();renderPreview()}
-function reorderFields(sourceId,targetId){if(!sourceId||sourceId===targetId)return;const from=state.fields.findIndex(x=>x.id===sourceId),to=state.fields.findIndex(x=>x.id===targetId);if(from<0||to<0)return;const[item]=state.fields.splice(from,1);state.fields.splice(to,0,item);scheduleSave();renderEditor();renderPreview()}
-function addField(type){state.fields.push({id:createId('field'),type,label:'',required:false,height:type==='textarea'?115:undefined,accent:'blue',columns:type==='checkbox'?1:undefined,options:type==='checkbox'?[{id:createId('opt'),label:'Možnost 1'},{id:createId('opt'),label:'Možnost 2'}]:undefined});addMenu.classList.remove('open');scheduleSave();renderEditor();renderPreview()}
-function renderPreview(){previewContent.innerHTML='';if((state.title||'').trim()){const h=document.createElement('h2');h.textContent=state.title.trim();previewContent.append(h)}if((state.instructions||'').trim()){const p=document.createElement('p');p.textContent=state.instructions.trim();previewContent.append(p)}state.fields.forEach(field=>{const wrap=document.createElement('div');wrap.className='preview-field';wrap.style.background=fieldBackground(field.accent);if((field.label||'').trim()){const label=document.createElement('label');label.textContent=field.label.trim();wrap.append(label)}if(field.type==='textarea'){const fake=document.createElement('div');fake.className='preview-input';fake.style.minHeight=Math.max(80,Number(field.height)||115)+'px';wrap.append(fake)}else if(field.type==='checkbox'){const grid=document.createElement('div');grid.className='preview-checkbox-grid';grid.style.gridTemplateColumns=`repeat(${field.columns||1},minmax(0,1fr))`;field.options.forEach(opt=>{const row=document.createElement('label');row.className='preview-check';const box=document.createElement('input');box.type='checkbox';row.append(box,document.createTextNode(opt.label||'Text'));grid.append(row)});wrap.append(grid)}else{const row=document.createElement('div');row.className='preview-yesno';['Ano','Ne'].forEach(t=>{const c=document.createElement('label');c.className='preview-check';const r=document.createElement('input');r.type='radio';r.name='preview_'+field.id;c.append(r,document.createTextNode(t));row.append(c)});wrap.append(row)}previewContent.append(wrap)})}
-function openPreview(){renderPreview();previewDrawer.classList.add('open');backdrop.classList.add('open');previewDrawer.setAttribute('aria-hidden','false')}function closePreview(){previewDrawer.classList.remove('open');backdrop.classList.remove('open');previewDrawer.setAttribute('aria-hidden','true')}function autoSizeInstructions(){instructionsEl.style.height='auto';instructionsEl.style.height=Math.max(28,instructionsEl.scrollHeight)+'px'}
-internalTitleEl.oninput=()=>{state.internalTitle=internalTitleEl.value;scheduleSave()};titleEl.oninput=()=>{state.title=titleEl.value;scheduleSave();renderPreview()};instructionsEl.oninput=()=>{state.instructions=instructionsEl.value;autoSizeInstructions();scheduleSave();renderPreview()};addButton.onclick=e=>{e.stopPropagation();addMenu.classList.toggle('open')};addMenu.onclick=e=>{const b=e.target.closest('[data-type]');if(b)addField(b.dataset.type)};document.addEventListener('click',e=>{if(!e.target.closest('.add-wrap'))addMenu.classList.remove('open')});document.getElementById('previewButton').onclick=openPreview;document.getElementById('closePreview').onclick=closePreview;backdrop.onclick=closePreview;document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreview()});renderEditor();renderPreview();scheduleSave();
+
+function renderTextarea(field,body){
+  const ta=document.createElement('textarea');ta.placeholder='Text';ta.style.height=Math.max(80,Number(field.height)||115)+'px';
+  const remember=()=>{field.height=Math.min(500,Math.max(80,Math.round(ta.getBoundingClientRect().height)));scheduleSave();renderPreview()};
+  ta.onmouseup=remember;ta.ontouchend=remember;body.append(ta);
+}
+function renderCheckboxEditor(field,body){
+  const toolbar=document.createElement('div');toolbar.className='checkbox-toolbar';
+  const label=document.createElement('span');label.textContent='Sloupce';
+  const segmented=document.createElement('div');segmented.className='segmented';
+  [1,2,3].forEach(n=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.classList.toggle('active',Number(field.columns||1)===n);b.onclick=()=>{field.columns=n;renderEditor();scheduleSave();renderPreview()};segmented.append(b)});
+  toolbar.append(label,segmented);body.append(toolbar);
+  const grid=document.createElement('div');grid.className='checkbox-grid';grid.style.gridTemplateColumns='repeat('+Number(field.columns||1)+',minmax(0,1fr))';
+  (field.options||[]).forEach(option=>{
+    const item=document.createElement('label');item.className='check-item';
+    const box=document.createElement('input');box.type='checkbox';box.disabled=true;
+    const input=document.createElement('input');input.className='option-label';input.value=option.label||'';input.placeholder='Možnost';
+    input.oninput=()=>{option.label=input.value;scheduleSave();renderPreview()};
+    const del=document.createElement('button');del.type='button';del.className='option-delete';del.textContent='×';del.onclick=e=>{e.preventDefault();field.options=field.options.filter(o=>o.id!==option.id);renderEditor();scheduleSave();renderPreview()};
+    item.append(box,input,del);grid.append(item);
+  });
+  body.append(grid);
+  const add=document.createElement('button');add.type='button';add.className='add-option-inline';add.textContent='+ možnost';
+  add.onclick=()=>{field.options.push({id:createId('opt'),label:'Nová možnost'});renderEditor();scheduleSave();renderPreview()};body.append(add);
+}
+function renderYesNo(body){const row=document.createElement('div');row.className='yesno-row';['Ano','Ne'].forEach(x=>{const b=document.createElement('button');b.type='button';b.className='yesno-choice';b.textContent=x;b.disabled=true;row.append(b)});body.append(row)}
+function cycleAccent(field){const values=['blue','green','purple','orange','red'];field.accent=values[(values.indexOf(field.accent)+1+values.length)%values.length]||'blue';renderEditor();scheduleSave();renderPreview()}
+function deleteField(round,fieldId){round.fields=round.fields.filter(field=>field.id!==fieldId);renderEditor();scheduleSave();renderPreview()}
+function reorderFields(round,fromId,toId){if(!fromId||fromId===toId)return;const from=round.fields.findIndex(f=>f.id===fromId),to=round.fields.findIndex(f=>f.id===toId);if(from<0||to<0)return;const moved=round.fields.splice(from,1)[0];round.fields.splice(to,0,moved);renderEditor();scheduleSave();renderPreview()}
+function addField(round,type){round.fields.push(normalizeField(createField(type)));renderEditor();scheduleSave();renderPreview()}
+function addRound(){state.rounds.push(createRound(false));previewRoundIndex=state.rounds.length-1;renderEditor();scheduleSave();renderPreview();setTimeout(()=>{const nodes=document.querySelectorAll('.round-editor');const target=nodes[nodes.length-1];if(target)target.scrollIntoView({behavior:'smooth',block:'start'})},0)}
+function deleteRound(roundId){if(state.rounds.length<=1)return;if(!confirm('Smazat tento Round?'))return;state.rounds=state.rounds.filter(round=>round.id!==roundId);previewRoundIndex=Math.min(previewRoundIndex,state.rounds.length-1);syncLegacyAliases();renderEditor();scheduleSave();renderPreview()}
+
+function renderFieldCard(round,field){
+  const card=document.createElement('article');card.className='field-card';card.dataset.id=field.id;card.draggable=true;card.style.setProperty('--field-accent',accentColor(field.accent));card.style.background=fieldBackground(field.accent);
+  const head=document.createElement('div');head.className='field-head';
+  const title=document.createElement('input');title.className='field-title';title.placeholder='Nadpis';title.value=field.label||'';title.oninput=()=>{field.label=title.value;scheduleSave();renderPreview()};
+  const actions=document.createElement('div');actions.className='field-mini-actions';
+  actions.append(iconButton('Barva','<span class="accent-dot"></span>',()=>cycleAccent(field)),iconButton('Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>',()=>deleteField(round,field.id),true));
+  head.append(title,actions);
+  const body=document.createElement('div');body.className='field-body';
+  if(field.type==='textarea')renderTextarea(field,body);else if(field.type==='checkbox')renderCheckboxEditor(field,body);else renderYesNo(body);
+  const drag=document.createElement('button');drag.className='drag-handle';drag.type='button';drag.innerHTML='<span class="drag-dots"></span>';drag.title='Přesunout položku';
+  drag.onmousedown=()=>{draggedField={roundId:round.id,fieldId:field.id}};
+  card.addEventListener('dragstart',e=>{if(!draggedField||draggedField.fieldId!==field.id){e.preventDefault();return}card.classList.add('dragging');e.dataTransfer.setData('text/plain',field.id)});
+  card.addEventListener('dragend',()=>{draggedField=null;document.querySelectorAll('.field-card').forEach(el=>el.classList.remove('dragging','drag-over'))});
+  card.addEventListener('dragover',e=>{if(!draggedField||draggedField.roundId!==round.id||draggedField.fieldId===field.id)return;e.preventDefault();card.classList.add('drag-over')});
+  card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
+  card.addEventListener('drop',e=>{e.preventDefault();if(draggedField&&draggedField.roundId===round.id)reorderFields(round,draggedField.fieldId,field.id)});
+  card.append(head,body,drag);return card;
+}
+
+function renderEditor(){
+  syncLegacyAliases();
+  roundsRoot.innerHTML='';
+  state.rounds.forEach((round,index)=>{
+    const section=document.createElement('section');section.className='editor-canvas round-editor';section.dataset.roundId=round.id;
+    const badge=document.createElement('div');badge.className='round-label';badge.textContent='Round '+(index+1);section.appendChild(badge);
+    if(state.rounds.length>1&&index>0){
+      const del=document.createElement('button');del.type='button';del.className='round-delete';del.title='Smazat Round '+(index+1);del.setAttribute('aria-label',del.title);del.innerHTML='<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>';del.onclick=()=>deleteRound(round.id);section.appendChild(del);
+    }
+    const title=document.createElement('input');title.className='editable-title';title.type='text';title.placeholder='Nadpis formuláře';title.value=round.title||'';title.oninput=()=>{round.title=title.value;if(index===0)syncLegacyAliases();scheduleSave();renderPreview()};
+    const instructions=document.createElement('textarea');instructions.className='editable-instructions';instructions.rows=1;instructions.placeholder='Klikněte a napište instrukci';instructions.value=round.instructions||'';instructions.oninput=()=>{round.instructions=instructions.value;instructions.style.height='auto';instructions.style.height=instructions.scrollHeight+'px';if(index===0)syncLegacyAliases();scheduleSave();renderPreview()};
+    section.append(title,instructions);
+    const fields=document.createElement('div');fields.className='round-fields';(round.fields||[]).forEach(field=>fields.appendChild(renderFieldCard(round,field)));section.appendChild(fields);
+    const addWrap=document.createElement('div');addWrap.className='add-wrap';
+    const button=document.createElement('button');button.className='add-button';button.type='button';button.textContent='+';
+    const menu=document.createElement('div');menu.className='add-menu';
+    [['textarea','Textové pole'],['checkbox','Checkbox'],['yes_no','Ano / Ne']].forEach(item=>{const option=document.createElement('button');option.className='add-option';option.type='button';option.textContent=item[1];option.onclick=()=>{addField(round,item[0]);menu.classList.remove('open')};menu.append(option)});
+    if(index===state.rounds.length-1){const divider=document.createElement('div');divider.className='add-menu-divider';menu.append(divider);const newRound=document.createElement('button');newRound.type='button';newRound.className='add-option round-option';newRound.textContent='＋ Nový Round';newRound.onclick=()=>{menu.classList.remove('open');addRound()};menu.append(newRound)}
+    button.onclick=e=>{e.stopPropagation();document.querySelectorAll('.add-menu.open').forEach(x=>{if(x!==menu)x.classList.remove('open')});menu.classList.toggle('open')};
+    addWrap.append(button,menu);section.append(addWrap);roundsRoot.append(section);
+    requestAnimationFrame(()=>{instructions.style.height='auto';instructions.style.height=instructions.scrollHeight+'px'});
+  });
+}
+
+function renderPreview(){
+  if(!previewContent)return;
+  if(previewRoundIndex>=state.rounds.length)previewRoundIndex=0;
+  const round=state.rounds[previewRoundIndex]||state.rounds[0];
+  previewContent.innerHTML='';
+  if(state.rounds.length>1){
+    const tabs=document.createElement('div');tabs.className='preview-round-tabs';
+    state.rounds.forEach((item,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='preview-round-tab'+(index===previewRoundIndex?' active':'');tab.textContent='Round '+(index+1);tab.onclick=()=>{previewRoundIndex=index;renderPreview()};tabs.append(tab)});
+    previewContent.append(tabs);
+  }
+  const h=document.createElement('h2');h.textContent=round.title||'Nadpis formuláře';previewContent.append(h);
+  if(round.instructions){const p=document.createElement('p');p.textContent=round.instructions;previewContent.append(p)}
+  (round.fields||[]).forEach(field=>{
+    const box=document.createElement('div');box.className='preview-field';box.style.background=fieldBackground(field.accent);
+    const label=document.createElement('label');label.textContent=field.label||'Položka';box.append(label);
+    if(field.type==='textarea'){const input=document.createElement('div');input.className='preview-input';input.style.minHeight=Math.max(80,Number(field.height)||115)+'px';box.append(input)}
+    else if(field.type==='checkbox'){const grid=document.createElement('div');grid.className='preview-checkbox-grid';grid.style.gridTemplateColumns='repeat('+Number(field.columns||1)+',minmax(0,1fr))';(field.options||[]).forEach(option=>{const row=document.createElement('label');row.className='preview-check';const cb=document.createElement('input');cb.type='checkbox';cb.disabled=true;const text=document.createElement('span');text.textContent=option.label||'';row.append(cb,text);grid.append(row)});box.append(grid)}
+    else{const yn=document.createElement('div');yn.className='preview-yesno';yn.innerHTML='<button disabled>Ano</button><button disabled>Ne</button>';box.append(yn)}
+    previewContent.append(box);
+  });
+}
+function openPreview(){renderPreview();previewDrawer.classList.add('open');previewDrawer.setAttribute('aria-hidden','false');backdrop.classList.add('open')}
+function closePreview(){previewDrawer.classList.remove('open');previewDrawer.setAttribute('aria-hidden','true');backdrop.classList.remove('open')}
+function autoSizeInstructions(){document.querySelectorAll('.editable-instructions').forEach(el=>{el.style.height='auto';el.style.height=el.scrollHeight+'px'})}
+
+normalizeLoadedState();
+internalTitleEl.value=state.internalTitle||'Nový formulář';
+renderEditor();
+renderPreview();
+setSaveStatus('Uloženo','cloud','Draft připraven');
+
+internalTitleEl.oninput=()=>{state.internalTitle=internalTitleEl.value;scheduleSave()};
+document.getElementById('previewButton').onclick=openPreview;
+document.getElementById('closePreview').onclick=closePreview;
+backdrop.onclick=closePreview;
+document.addEventListener('click',()=>document.querySelectorAll('.add-menu.open').forEach(menu=>menu.classList.remove('open')));
 </script>
 </body></html>
