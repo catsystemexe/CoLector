@@ -191,8 +191,8 @@
           const part=rounds[0]||null;
           const distributed=part?Number(part.distributedCount)||0:total;
           const selected=part?Number(part.submittedCount)||0:collected;
-          const progress=document.createElement('span');progress.className='total-progress';progress.title='Rozdáno / vybráno';
-          progress.innerHTML='<span class="distributed">'+distributed+'</span><span class="sep">/</span><span class="selected">'+selected+'</span>';
+          const progress=document.createElement('span');progress.className='total-progress';progress.title='Vybráno / rozdáno';
+          progress.innerHTML='<span class="selected">'+selected+'</span><span class="sep">/</span><span class="distributed">'+distributed+'</span>';
           meta.append(progress);
         }else{
           const totalEl=document.createElement('span');totalEl.className='total-participants';totalEl.textContent='Celkem '+total;meta.append(totalEl);
