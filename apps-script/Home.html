@@ -7,13 +7,35 @@
   <meta name="theme-color" content="#079EAE">
   <title>CoLector</title>
   <style>
-    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182238;background:#f4f6fb;--accent:#079EAE;--line:#e4e8f0;--muted:#748096;--header:76px;--section:86px}*{box-sizing:border-box}html,body{min-height:100%;margin:0;background:#f4f6fb}body{overscroll-behavior-y:none}button{font:inherit;cursor:pointer}.app-header{position:fixed;z-index:50;top:0;left:0;right:0;height:var(--header);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;background:rgba(255,255,255,.97);border-bottom:1px solid #e6e9f0;box-shadow:0 2px 12px rgba(28,38,64,.05)}.brand-wrap{display:flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer}.brand-mark{width:44px;height:44px;flex:0 0 auto}.brand-mark svg{display:block;width:100%;height:100%}.section-name{font-size:14px;color:#68748a;font-weight:700}.header-nav{display:flex;gap:9px}.nav-btn{width:54px;height:54px;border:1px solid #dde3ec;border-radius:17px;background:#fff;color:#7c8799;display:grid;place-items:center;padding:0}.nav-btn svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.8}.nav-btn.active{background:linear-gradient(145deg,#12B8B5,#069EAE 55%,#087CA8);color:#fff;border-color:transparent;box-shadow:0 8px 20px rgba(7,158,174,.22)}.section-head{position:fixed;z-index:40;top:var(--header);left:50%;transform:translateX(-50%);width:min(calc(100% - 28px),620px);min-height:var(--section);display:flex;align-items:center;gap:16px;padding:13px 18px;background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 24px 24px;box-shadow:0 8px 24px rgba(26,37,62,.055)}.section-icon{width:60px;height:60px;display:grid;place-items:center;color:#079EAE;flex:0 0 auto}.section-icon svg{width:45px;height:45px;stroke:currentColor;fill:none;stroke-width:1.75}.section-title{font-size:21px;font-weight:850;color:#27334a}.forms-count{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;margin-left:6px;padding:0 8px;border-radius:999px;background:#eef3f6;color:#647086;font-size:13px;font-weight:850;vertical-align:2px}main{width:min(100%,620px);margin:0 auto;padding:calc(var(--header) + var(--section) + 10px) 8px 128px}.forms-list{display:grid;gap:8px}.form-row{min-height:78px;display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:6px}.form-qr{width:38px;height:38px;border:0;border-radius:12px;display:grid;place-items:center;background:#e7f8f8;color:#078f9f;padding:0}.form-qr:disabled{background:#f1f3f5;color:#b8bec8;cursor:default}.form-qr svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}.form-card{min-width:0;min-height:70px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;background:#fff;border:1px solid #edf0f5;border-radius:14px;overflow:hidden}.form-row.collecting .form-card{background:#eef6ff}.form-row.complete .form-card{background:#edf9f1}.form-main{min-width:0;height:100%;border:0;background:transparent;text-align:left;padding:11px 8px 11px 14px;color:#27334a}.form-title{font-weight:740;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.form-meta{margin-top:5px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}.progress{padding:2px 7px;border-radius:999px;background:rgba(7,158,174,.10);color:#087f8d;font-weight:800}.complete .progress{background:rgba(47,151,91,.12);color:#2c8653}.form-actions{display:flex;align-items:center;padding-right:4px}
-.round-strip{grid-column:1/-1;display:flex;align-items:center;gap:5px;padding:6px 9px 8px 13px;border-top:1px solid rgba(133,145,165,.12)}
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182238;background:#f4f6fb;--accent:#079EAE;--line:#e4e8f0;--muted:#748096;--header:76px;--section:86px}*{box-sizing:border-box}html,body{min-height:100%;margin:0;background:#f4f6fb}body{overscroll-behavior-y:none}button{font:inherit;cursor:pointer}.app-header{position:fixed;z-index:50;top:0;left:0;right:0;height:var(--header);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;background:rgba(255,255,255,.97);border-bottom:1px solid #e6e9f0;box-shadow:0 2px 12px rgba(28,38,64,.05)}.brand-wrap{display:flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer}.brand-mark{width:44px;height:44px;flex:0 0 auto}.brand-mark svg{display:block;width:100%;height:100%}.section-name{font-size:14px;color:#68748a;font-weight:700}.header-nav{display:flex;gap:9px}.nav-btn{width:54px;height:54px;border:1px solid #dde3ec;border-radius:17px;background:#fff;color:#7c8799;display:grid;place-items:center;padding:0}.nav-btn svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.8}.nav-btn.active{background:linear-gradient(145deg,#12B8B5,#069EAE 55%,#087CA8);color:#fff;border-color:transparent;box-shadow:0 8px 20px rgba(7,158,174,.22)}.section-head{position:fixed;z-index:40;top:var(--header);left:50%;transform:translateX(-50%);width:min(calc(100% - 28px),620px);min-height:var(--section);display:flex;align-items:center;gap:16px;padding:13px 18px;background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 24px 24px;box-shadow:0 8px 24px rgba(26,37,62,.055)}.section-icon{width:60px;height:60px;display:grid;place-items:center;color:#079EAE;flex:0 0 auto}.section-icon svg{width:45px;height:45px;stroke:currentColor;fill:none;stroke-width:1.75}.section-title{font-size:21px;font-weight:850;color:#27334a}.forms-count{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;margin-left:6px;padding:0 8px;border-radius:999px;background:#eef3f6;color:#647086;font-size:13px;font-weight:850;vertical-align:2px}main{width:min(100%,620px);margin:0 auto;padding:calc(var(--header) + var(--section) + 10px) 8px 128px}.forms-list{display:grid;gap:8px}
+.form-row{min-height:78px;display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:6px}
+.form-qr{width:38px;height:38px;border:0;border-radius:12px;display:grid;place-items:center;background:#e7f8f8;color:#078f9f;padding:0}
+.form-qr:disabled{background:#f1f3f5;color:#b8bec8;cursor:default}
+.form-qr svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+.swipe-shell{position:relative;min-width:0;overflow:hidden;border-radius:14px;touch-action:pan-y}
+.swipe-actions{position:absolute;z-index:0;inset:0 0 0 auto;width:136px;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;border-radius:14px}
+.swipe-action{border:0;display:grid;place-items:center;padding:0;color:#fff}
+.swipe-action svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.9}
+.swipe-action.duplicate{background:#657086}
+.swipe-action.delete{background:#c54c56}
+.form-card{position:relative;z-index:1;min-width:0;min-height:70px;display:grid;grid-template-columns:minmax(0,1fr);align-items:center;background:#fff;border:1px solid #edf0f5;border-radius:14px;overflow:hidden;transform:translateX(0);transition:transform .2s ease;will-change:transform;cursor:pointer}
+.form-card.dragging{transition:none}
+.form-row.collecting .form-card{background:#eef6ff}
+.form-row.complete .form-card{background:#edf9f1}
+.form-main{position:relative;min-width:0;width:100%;min-height:70px;border:0;background:transparent;text-align:left;padding:11px 48px 11px 14px;color:#27334a;cursor:pointer}
+.form-title{position:relative;z-index:1;font-weight:740;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.form-meta{position:relative;z-index:1;margin-top:5px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}
+.form-edit-watermark{position:absolute;right:12px;top:50%;transform:translateY(-50%) rotate(-7deg);width:43px;height:43px;color:#aeb8c8;opacity:.20;pointer-events:none}
+.form-edit-watermark svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.55}
+.progress{padding:2px 7px;border-radius:999px;background:rgba(7,158,174,.10);color:#087f8d;font-weight:800}
+.complete .progress{background:rgba(47,151,91,.12);color:#2c8653}
+.round-strip{display:flex;align-items:center;gap:5px;padding:6px 9px 8px 13px;border-top:1px solid rgba(133,145,165,.12);cursor:default}
 .round-strip-label{margin-right:2px;color:#8a94a6;font-size:10px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
 .home-round-lock{height:29px;min-width:39px;padding:0 7px;border:1px solid #dfe5ee;border-radius:9px;background:#f7f8fb;color:#7b8699;display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:900}
 .home-round-lock svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .home-round-lock.open{background:#edf9f1;border-color:#c9e8d5;color:#27845d}
-.home-round-lock:disabled{opacity:.5;cursor:default}.form-action{width:34px;height:36px;padding:0;border:0;border-radius:10px;background:transparent;color:#657086;display:grid;place-items:center}.form-action:hover{background:rgba(255,255,255,.72)}.form-action svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9}.form-action.danger{color:#c54c56}.form-action.danger:hover{background:#fff0f1}.empty{padding:24px 18px;background:#fff;border:1px solid var(--line);border-radius:16px;color:var(--muted);text-align:center}.home-bottom-dock{position:fixed;z-index:45;left:0;right:0;bottom:0;padding:30px 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(244,246,251,0),rgba(244,246,251,.95) 28%,#f4f6fb 52%)}.home-bottom-inner{width:min(100%,620px);margin:0 auto}.new-form{width:100%;min-height:84px;border:0;border-radius:28px;background:linear-gradient(135deg,#12B8B5,#069EAE 55%,#087CA8);color:#fff;font-size:21px;font-weight:820;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 24px rgba(7,158,174,.22)}.new-form .plus{font-size:34px;font-weight:400;line-height:1}.loading-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.96);opacity:1;transition:opacity 180ms ease}.loading-overlay.hidden{opacity:0;pointer-events:none}.loading-box{display:flex;flex-direction:column;align-items:center;gap:14px}.colector-loader,.colector-loader-svg{width:120px;height:120px}.loader-layer{transform-box:fill-box;transform-origin:center;opacity:0}.loader-layer-top{animation:top 2.2s ease-in-out infinite}.loader-layer-middle{animation:middle 2.2s ease-in-out infinite}.loader-layer-bottom{animation:bottom 2.2s ease-in-out infinite}.loading-text{font-size:16px;font-weight:650;color:#27334a}@keyframes top{0%{transform:translateY(-16px);opacity:0}22%{transform:translateY(0);opacity:1}48%{opacity:1}84%,100%{transform:translateY(30px);opacity:0}}@keyframes middle{0%,14%{transform:translateY(-14px);opacity:0}36%{transform:translateY(0);opacity:1}48%{opacity:1}88%,100%{transform:translateY(30px);opacity:0}}@keyframes bottom{0%,28%{transform:translateY(-12px);opacity:0}48%{transform:translateY(0);opacity:1}56%{opacity:1}92%,100%{transform:translateY(30px);opacity:0}}@media(prefers-reduced-motion:reduce){.loader-layer{animation:none!important;opacity:1;transform:none}}.qr-screen{position:fixed;z-index:100;inset:0;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px}.qr-screen.open{display:flex}.qr-close{position:absolute;top:14px;right:14px;width:44px;height:44px;border:0;border-radius:12px;background:#f1f3f8;color:#556178;font-size:26px}.qr-title{margin:0 0 20px;text-align:center;font-size:26px;color:#27334a}.qr-box{padding:14px;background:#fff;border-radius:18px;box-shadow:0 10px 34px rgba(25,35,58,.12)}@media(max-width:520px){:root{--header:72px;--section:84px}.brand-mark{width:40px;height:40px}.section-name{font-size:12px}.nav-btn{width:50px;height:50px;border-radius:15px}.nav-btn svg{width:25px;height:25px}.header-nav{gap:7px}.section-title{font-size:20px}}
+.home-round-lock:disabled{opacity:.5;cursor:default}
+.empty{padding:24px 18px;background:#fff;border:1px solid var(--line);border-radius:16px;color:var(--muted);text-align:center}.home-bottom-dock{position:fixed;z-index:45;left:0;right:0;bottom:0;padding:30px 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(244,246,251,0),rgba(244,246,251,.95) 28%,#f4f6fb 52%)}.home-bottom-inner{width:min(100%,620px);margin:0 auto}.new-form{width:100%;min-height:84px;border:0;border-radius:28px;background:linear-gradient(135deg,#12B8B5,#069EAE 55%,#087CA8);color:#fff;font-size:21px;font-weight:820;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 24px rgba(7,158,174,.22)}.new-form .plus{font-size:34px;font-weight:400;line-height:1}.loading-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.96);opacity:1;transition:opacity 180ms ease}.loading-overlay.hidden{opacity:0;pointer-events:none}.loading-box{display:flex;flex-direction:column;align-items:center;gap:14px}.colector-loader,.colector-loader-svg{width:120px;height:120px}.loader-layer{transform-box:fill-box;transform-origin:center;opacity:0}.loader-layer-top{animation:top 2.2s ease-in-out infinite}.loader-layer-middle{animation:middle 2.2s ease-in-out infinite}.loader-layer-bottom{animation:bottom 2.2s ease-in-out infinite}.loading-text{font-size:16px;font-weight:650;color:#27334a}@keyframes top{0%{transform:translateY(-16px);opacity:0}22%{transform:translateY(0);opacity:1}48%{opacity:1}84%,100%{transform:translateY(30px);opacity:0}}@keyframes middle{0%,14%{transform:translateY(-14px);opacity:0}36%{transform:translateY(0);opacity:1}48%{opacity:1}88%,100%{transform:translateY(30px);opacity:0}}@keyframes bottom{0%,28%{transform:translateY(-12px);opacity:0}48%{transform:translateY(0);opacity:1}56%{opacity:1}92%,100%{transform:translateY(30px);opacity:0}}@media(prefers-reduced-motion:reduce){.loader-layer{animation:none!important;opacity:1;transform:none}}.qr-screen{position:fixed;z-index:100;inset:0;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px}.qr-screen.open{display:flex}.qr-close{position:absolute;top:14px;right:14px;width:44px;height:44px;border:0;border-radius:12px;background:#f1f3f8;color:#556178;font-size:26px}.qr-title{margin:0 0 20px;text-align:center;font-size:26px;color:#27334a}.qr-box{padding:14px;background:#fff;border-radius:18px;box-shadow:0 10px 34px rgba(25,35,58,.12)}@media(max-width:520px){:root{--header:72px;--section:84px}.brand-mark{width:40px;height:40px}.section-name{font-size:12px}.nav-btn{width:50px;height:50px;border-radius:15px}.nav-btn svg{width:25px;height:25px}.header-nav{gap:7px}.section-title{font-size:20px}}
   </style>
 </head>
 <body>
@@ -29,14 +51,70 @@
     const participantUrl=id=>APP_URL+'?view=form&form='+encodeURIComponent(id);
     const fmt=v=>{if(!v)return'';const d=new Date(v);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}).format(d)};
     const lockSvg=open=>open?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+    const pencilSvg='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/></svg>';
+    let openSwipe=null;
+
     function hideLoader(){const x=document.getElementById('loadingOverlay');x.classList.add('hidden');setTimeout(()=>x.style.display='none',180)}
     function loadQr(){if(window.QRCode)return Promise.resolve();return new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js';s.onload=ok;s.onerror=bad;document.head.appendChild(s)})}
     function showQr(form){if(!form.publishedAt){alert('Formulář nejdřív publikuj v Editoru.');return}qrTitle.textContent=form.title||form.internalTitle||'Formulář';qrBox.innerHTML='';qrScreen.classList.add('open');loadQr().then(()=>new QRCode(qrBox,{text:participantUrl(form.formId),width:260,height:260,colorDark:'#111827',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M})).catch(()=>qrBox.textContent='QR kód se nepodařilo načíst.')}
+
+    function closeSwipe(shell,animate=true){
+      if(!shell)return;
+      const card=shell.querySelector('.form-card');if(!card)return;
+      if(!animate)card.classList.add('dragging');
+      card.style.transform='translateX(0)';
+      if(!animate)requestAnimationFrame(()=>card.classList.remove('dragging'));
+      shell.dataset.open='0';
+      if(openSwipe===shell)openSwipe=null;
+    }
+    function openSwipeActions(shell){
+      if(openSwipe&&openSwipe!==shell)closeSwipe(openSwipe);
+      const card=shell.querySelector('.form-card');if(!card)return;
+      card.style.transform='translateX(-136px)';
+      shell.dataset.open='1';openSwipe=shell;
+    }
+    function installSwipe(shell,card){
+      let pointerId=null,startX=0,startY=0,startOffset=0,dragging=false,moved=false;
+      const max=136;
+      card.addEventListener('pointerdown',e=>{
+        if(e.button!=null&&e.button!==0)return;
+        if(e.target.closest('.home-round-lock'))return;
+        pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startOffset=shell.dataset.open==='1'?-max:0;dragging=false;moved=false;
+        card.setPointerCapture&&card.setPointerCapture(pointerId);
+      });
+      card.addEventListener('pointermove',e=>{
+        if(pointerId!==e.pointerId)return;
+        const dx=e.clientX-startX,dy=e.clientY-startY;
+        if(!dragging){
+          if(Math.abs(dx)<7&&Math.abs(dy)<7)return;
+          if(Math.abs(dy)>Math.abs(dx)){pointerId=null;return}
+          dragging=true;card.classList.add('dragging');
+          if(openSwipe&&openSwipe!==shell)closeSwipe(openSwipe);
+        }
+        moved=true;e.preventDefault();
+        const x=Math.max(-max,Math.min(0,startOffset+dx));
+        card.style.transform='translateX('+x+'px)';
+      });
+      const end=e=>{
+        if(pointerId!==e.pointerId)return;
+        if(dragging){
+          const dx=e.clientX-startX;
+          const projected=startOffset+dx;
+          card.classList.remove('dragging');
+          if(projected<-max*.42)openSwipeActions(shell);else closeSwipe(shell);
+          card.dataset.suppressClick='1';setTimeout(()=>delete card.dataset.suppressClick,0);
+        }
+        pointerId=null;dragging=false;
+      };
+      card.addEventListener('pointerup',end);
+      card.addEventListener('pointercancel',()=>{if(pointerId!=null){card.classList.remove('dragging');closeSwipe(shell);pointerId=null;dragging=false}});
+    }
 
     function roundStrip(form){
       const rounds=Array.isArray(form.rounds)?form.rounds:[];
       if(!form.publishedAt||!rounds.length)return null;
       const strip=document.createElement('div');strip.className='round-strip';
+      strip.onclick=e=>e.stopPropagation();
       const label=document.createElement('span');label.className='round-strip-label';label.textContent='Rounds';strip.append(label);
       rounds.forEach(round=>{
         const button=document.createElement('button');button.type='button';button.className='home-round-lock'+(round.unlocked?' open':'');
@@ -52,32 +130,54 @@
       return strip;
     }
 
+    function hiddenAction(title,html,cls,fn){
+      const b=document.createElement('button');b.type='button';b.className='swipe-action '+cls;b.title=title;b.setAttribute('aria-label',title);b.innerHTML=html;
+      b.onclick=e=>{e.stopPropagation();fn()};return b;
+    }
+
     function render(forms){
-      recentFormsEl.innerHTML='';
-      const items=forms||[];
-      formsCountEl.textContent=String(items.length);
+      openSwipe=null;recentFormsEl.innerHTML='';
+      const items=forms||[];formsCountEl.textContent=String(items.length);
       if(!items.length){recentFormsEl.innerHTML='<div class="empty">Zatím nemáš žádný formulář.</div>';return}
       items.forEach(form=>{
         const distributed=Number(form.distributedCount)||0,collected=Number(form.collectedCount)||0;
-        const row=document.createElement('div');row.className='form-row';if(distributed>0)row.classList.add(collected>=distributed?'complete':'collecting');
-        const qr=document.createElement('button');qr.className='form-qr';qr.innerHTML='<svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M15 14h2v2h-2zM19 14h2v4h-2zM14 19h4v2h-4zM20 20h1v1h-1z"/></svg>';if(form.publishedAt)qr.onclick=e=>{e.stopPropagation();showQr(form)};else qr.disabled=true;
-        const card=document.createElement('div');card.className='form-card';
-        const main=document.createElement('button');main.className='form-main';main.innerHTML='<div class="form-title"></div><div class="form-meta"><span>'+fmt(form.updatedAt||form.createdAt)+'</span></div>';main.querySelector('.form-title').textContent=form.internalTitle||form.title||'Bez názvu';
-        if(distributed>0){const p=document.createElement('span');p.className='progress';p.textContent=collected+'/'+distributed;main.querySelector('.form-meta').append(p)}
-        main.onclick=()=>go('?view=session&form='+encodeURIComponent(form.formId));
-        const actions=document.createElement('div');actions.className='form-actions';
-        const edit=action('Editor','<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',()=>go('?view=editor&form='+encodeURIComponent(form.formId)));
-        const dup=action('Duplikovat','<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',()=>google.script.run.withSuccessHandler(r=>r&&r.formId?go('?view=editor&form='+encodeURIComponent(r.formId)):load()).duplicateFormDraft(form.formId));
-        const del=action('Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>',()=>{if(confirm('Smazat tento formulář?'))google.script.run.withSuccessHandler(load).deleteFormDraft(form.formId)},true);
-        actions.append(edit,dup,del);
-        card.append(main,actions);
+        const isDistributed=distributed>0;
+        const row=document.createElement('div');row.className='form-row';if(isDistributed)row.classList.add(collected>=distributed?'complete':'collecting');
+
+        const qr=document.createElement('button');qr.className='form-qr';qr.innerHTML='<svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M15 14h2v2h-2zM19 14h2v4h-2zM14 19h4v2h-4zM20 20h1v1h-1z"/></svg>';
+        if(form.publishedAt)qr.onclick=e=>{e.stopPropagation();showQr(form)};else qr.disabled=true;
+
+        const shell=document.createElement('div');shell.className='swipe-shell';shell.dataset.open='0';
+        const actions=document.createElement('div');actions.className='swipe-actions';
+        const dup=hiddenAction('Duplikovat','<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>','duplicate',()=>google.script.run.withSuccessHandler(r=>r&&r.formId?go('?view=editor&form='+encodeURIComponent(r.formId)):load()).duplicateFormDraft(form.formId));
+        const del=hiddenAction('Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>','delete',()=>{if(confirm('Smazat tento formulář?'))google.script.run.withSuccessHandler(load).deleteFormDraft(form.formId)});
+        actions.append(dup,del);
+
+        const card=document.createElement('div');card.className='form-card';card.setAttribute('role','button');card.tabIndex=0;
+        card.setAttribute('aria-label',isDistributed?'Otevřít Session':'Upravit formulář');
+        const main=document.createElement('div');main.className='form-main';
+        main.innerHTML='<div class="form-title"></div><div class="form-meta"><span>'+fmt(form.updatedAt||form.createdAt)+'</span></div>';
+        main.querySelector('.form-title').textContent=form.internalTitle||form.title||'Bez názvu';
+        if(isDistributed){const p=document.createElement('span');p.className='progress';p.textContent=collected+'/'+distributed;main.querySelector('.form-meta').append(p)}
+        else{const watermark=document.createElement('span');watermark.className='form-edit-watermark';watermark.innerHTML=pencilSvg;main.append(watermark)}
+        card.append(main);
         const strip=roundStrip(form);if(strip)card.append(strip);
-        row.append(qr,card);recentFormsEl.append(row);
+
+        const activate=()=>{
+          if(card.dataset.suppressClick==='1')return;
+          if(shell.dataset.open==='1'){closeSwipe(shell);return}
+          go((isDistributed?'?view=session&form=':'?view=editor&form=')+encodeURIComponent(form.formId));
+        };
+        card.onclick=e=>{if(e.target.closest('.home-round-lock'))return;activate()};
+        card.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.home-round-lock')){e.preventDefault();activate()}};
+
+        installSwipe(shell,card);
+        shell.append(actions,card);row.append(qr,shell);recentFormsEl.append(row);
       });
     }
 
-    function action(title,html,fn,danger){const b=document.createElement('button');b.className='form-action'+(danger?' danger':'');b.title=title;b.innerHTML=html;b.onclick=e=>{e.stopPropagation();fn()};return b}
     function load(){google.script.run.withSuccessHandler(forms=>{render(forms);hideLoader()}).withFailureHandler(()=>{recentFormsEl.innerHTML='<div class="empty">Formuláře se nepodařilo načíst.</div>';hideLoader()}).getHomeFormSummaries()}
+    document.addEventListener('pointerdown',e=>{if(openSwipe&&!openSwipe.contains(e.target))closeSwipe(openSwipe)});
     document.getElementById('homeBrand').onclick=()=>go('?view=home');
     document.getElementById('navTemplates').onclick=()=>go('?view=forms');
     document.getElementById('navData').onclick=()=>go('?view=data');
