@@ -18,7 +18,7 @@ function doGet(e) {
   const params = (e && e.parameter) || {};
   const view = params.view || '';
 
-  if (view === 'editor') return renderEditor_();
+  if (view === 'editor') return renderEditor_(params.form || '', params.new === '1');
   if (view === 'session') return renderSession_(params.form || '');
   if (view === 'forms') return renderTemplatePage_('Forms', 'CoLector — Moje formuláře');
   if (view === 'data') return renderTemplatePage_('Data', 'CoLector — Data a výsledky');
@@ -66,9 +66,11 @@ function renderParticipant_(formId) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function renderEditor_() {
+function renderEditor_(formId, isNew) {
   const baseHtml = HtmlService.createHtmlOutputFromFile('Admin').getContent();
-  const html = baseHtml.replace('</body>', getEditorRouteBootstrap_() + '\n</body>');
+  const routeConfig = '<script>window.COLECTOR_ROUTE_FORM_ID=' + JSON.stringify(String(formId || '')) + ';window.COLECTOR_ROUTE_NEW=' + (isNew ? 'true' : 'false') + ';<\/script>';
+  const routedHtml = baseHtml.replace('<script>', routeConfig + '\n<script>');
+  const html = routedHtml.replace('</body>', getEditorRouteBootstrap_() + '\n</body>');
   return HtmlService.createHtmlOutput(html).setTitle('CoLector — Editor formuláře')
     .setFaviconUrl(APP_ICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
@@ -157,8 +159,10 @@ function getEditorRouteBootstrap_() {
       publishButton.disabled=true;
       const original=publishButton.innerHTML;
       publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Publikuji…</span>';
-      google.script.run.withSuccessHandler(function(){
-        publishedSnapshot=JSON.parse(JSON.stringify(buildSchema()));
+      google.script.run.withSuccessHandler(function(result){
+        const currentSchema=buildSchema();
+        publishedSnapshot=JSON.parse(JSON.stringify(currentSchema));
+        writeFormCache(currentSchema,Date.parse((result&&result.publishedAt)||'')||Date.now());
         refreshPublishState();
         publishButton.classList.add('publish-ok');
         publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg></span><span>Publikováno</span>';
@@ -174,7 +178,7 @@ function getEditorRouteBootstrap_() {
     deleteButton.addEventListener('click',function(){
       if(!confirm('Opravdu chceš smazat tento formulář?'))return;
       deleteButton.disabled=true;
-      google.script.run.withSuccessHandler(function(){try{localStorage.removeItem(STORAGE_KEY)}catch(e){}goHome()}).withFailureHandler(function(error){deleteButton.disabled=false;alert((error&&error.message)||'Smazání se nepodařilo.')}).deleteFormDraft(state.formId);
+      google.script.run.withSuccessHandler(function(){try{localStorage.removeItem(STORAGE_KEY)}catch(e){}clearFormCache(state.formId);goHome()}).withFailureHandler(function(error){deleteButton.disabled=false;alert((error&&error.message)||'Smazání se nepodařilo.')}).deleteFormDraft(state.formId);
     });
     headerActions.appendChild(deleteButton);
   }
@@ -191,14 +195,16 @@ function getEditorRouteBootstrap_() {
     canvas.appendChild(resetButton);
   }
 
-  function applyEditorSchema(schema){
+  function applyEditorSchema(schema,options){
     clearTimeout(saveTimer);
     Object.keys(state).forEach(function(key){delete state[key]});
     Object.assign(state,schema||{});
     state.version=state.version||2;
     if(!state.formId)state.formId=createId('form');
     state.internalTitle=state.internalTitle||'Nový formulář';state.title=state.title||'';state.instructions=state.instructions||'';state.fields=Array.isArray(state.fields)?state.fields:[];
-    normalizeLoadedState();internalTitleEl.value=state.internalTitle;titleEl.value=state.title;instructionsEl.value=state.instructions;autoSizeInstructions();renderEditor();renderPreview();scheduleSave();
+    normalizeLoadedState();internalTitleEl.value=state.internalTitle;titleEl.value=state.title;instructionsEl.value=state.instructions;autoSizeInstructions();renderEditor();renderPreview();
+    if(options&&options.save===false)setSaveStatus('Uloženo','cloud','Draft ověřen se serverem');
+    else scheduleSave();
   }
 
   function createBlankSchema(){return{version:2,formId:createId('form'),internalTitle:'Nový formulář',title:'',instructions:'',fields:[{id:createId('field'),type:'textarea',label:'',required:false,height:115,accent:'blue'}]}}
@@ -210,8 +216,27 @@ function getEditorRouteBootstrap_() {
     const params=(location&&location.parameter)||{};
     if(params.new==='1'){applyEditorSchema(createBlankSchema());return}
     if(params.form){
-      setSaveStatus('Načítám…','saving','Načítám formulář');
-      google.script.run.withSuccessHandler(function(result){if(!result||!result.schema){setSaveStatus('Nenalezeno','error','Formulář nebyl nalezen');return}publishedSnapshot=result.publishedSchema||null;applyEditorSchema(result.schema);refreshPublishState()}).withFailureHandler(function(error){const message=error&&error.message?error.message:'Formulář se nepodařilo načíst';setSaveStatus('Chyba','error',message)}).getFormDraft(params.form);
+      const cachedRecord=readFormCacheRecord(params.form);
+      setSaveStatus(cachedRecord?'Ověřuji…':'Načítám…','saving',cachedRecord?'Ověřuji lokální draft se serverem':'Načítám formulář');
+      google.script.run.withSuccessHandler(function(result){
+        if(!result||!result.schema){setSaveStatus('Nenalezeno','error','Formulář nebyl nalezen');return}
+        publishedSnapshot=result.publishedSchema||null;
+        const serverUpdatedAt=Date.parse(result.updatedAt||'')||0;
+        const latestLocal=readFormCacheRecord(params.form);
+        if(latestLocal&&Number(latestLocal.savedAt||0)>serverUpdatedAt){
+          refreshPublishState();
+          scheduleSave();
+          return;
+        }
+        writeFormCache(result.schema,serverUpdatedAt||Date.now());
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(result.schema))}catch(e){}
+        applyEditorSchema(result.schema,{save:false});
+        refreshPublishState();
+      }).withFailureHandler(function(error){
+        const message=error&&error.message?error.message:'Formulář se nepodařilo načíst';
+        if(cachedRecord)setSaveStatus('Lokálně','local','Zobrazen lokální draft; serverové ověření selhalo');
+        else setSaveStatus('Chyba','error',message);
+      }).getFormDraft(params.form);
       return;
     }
     scheduleSave();
