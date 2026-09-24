@@ -17,7 +17,7 @@
     const TEAM_KEY='colector.team.id';
     const sheet=document.getElementById('sheet');
     const teamId=getTeamId();
-    let currentSchema=null,currentRoundId='',currentStatus='',pollTimer=null;
+    let currentSchema=null,currentRoundId='',currentRoundNumber=0,currentStatus='',pollTimer=null;
 
     function makeId(prefix){return prefix+'_'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+Math.random().toString(36).slice(2))}
     function getTeamId(){try{let id=localStorage.getItem(TEAM_KEY);if(!id){id=makeId('team');localStorage.setItem(TEAM_KEY,id)}return id}catch(e){return makeId('team')}}
@@ -76,7 +76,7 @@
     }
 
     function renderReady(result){
-      currentStatus='ready';currentRoundId=result.roundId;currentSchema=result.schema;sheet.innerHTML='';
+      currentStatus='ready';currentRoundId=result.roundId;currentRoundNumber=Number(result.roundNumber)||0;currentSchema=result.schema;sheet.innerHTML='';
       if(currentSchema.title){const h=document.createElement('h1');h.textContent=currentSchema.title;sheet.appendChild(h)}
       if(currentSchema.instructions){const p=document.createElement('p');p.className='instructions';p.textContent=currentSchema.instructions;sheet.appendChild(p)}
       const fields=document.createElement('div');fields.className='fields';(currentSchema.fields||[]).forEach(field=>{const rendered=renderField(field);if(rendered)fields.appendChild(rendered)});sheet.appendChild(fields);
@@ -101,18 +101,18 @@
     }
 
     function renderLocked(result){
-      currentStatus='locked';currentSchema=null;currentRoundId=result.roundId||'';
+      currentStatus='locked';currentSchema=null;currentRoundId=result.roundId||'';currentRoundNumber=Number(result.roundNumber)||currentRoundNumber||0;
       sheet.innerHTML='<div class="state"><div class="waiting-pulse" aria-hidden="true"></div><strong>Čekáme na otevření</strong>Formulář se zobrazí automaticky, jakmile operátor odemkne tento Round.</div>';
     }
 
     function renderComplete(){
-      currentStatus='complete';currentSchema=null;currentRoundId='';
+      currentStatus='complete';currentSchema=null;currentRoundId='';currentRoundNumber=0;
       sheet.innerHTML='<div class="state"><strong>Hotovo</strong>Všechny části formuláře byly odevzdány.</div>';
       if(pollTimer){clearInterval(pollTimer);pollTimer=null}
     }
 
     function renderUnavailable(){
-      currentStatus='unavailable';currentSchema=null;currentRoundId='';
+      currentStatus='unavailable';currentSchema=null;currentRoundId='';currentRoundNumber=0;
       sheet.innerHTML='<div class="state"><strong>Formulář není dostupný</strong>Formulář zatím nebyl publikován nebo už neexistuje.</div>';
     }
 
@@ -133,8 +133,22 @@
       google.script.run.withSuccessHandler(result=>handleView(result,!!force)).withFailureHandler(()=>{if(currentStatus!=='ready')sheet.innerHTML='<div class="state"><strong>Formulář se nepodařilo načíst</strong>Zkuste stránku obnovit.</div>'}).getParticipantRoundView({formId:FORM_ID,teamId:teamId});
     }
 
+    function pollGate(){
+      if(!FORM_ID||!currentRoundId||currentStatus==='complete'||currentStatus==='unavailable')return;
+      const statusBefore=currentStatus;
+      google.script.run.withSuccessHandler(result=>{
+        if(!result)return;
+        if(statusBefore==='ready'&&!result.unlocked){
+          writeDraft();
+          renderLocked({roundId:currentRoundId,roundNumber:currentRoundNumber});
+        }else if(statusBefore==='locked'&&result.unlocked){
+          loadView(true);
+        }
+      }).withFailureHandler(()=>{}).getRoundLockState({formId:FORM_ID,roundId:currentRoundId,roundNumber:currentRoundNumber});
+    }
+
     loadView(true);
-    pollTimer=setInterval(()=>loadView(false),3000);
+    pollTimer=setInterval(pollGate,3000);
   </script>
 </body>
 </html>
