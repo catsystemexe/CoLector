@@ -15,6 +15,7 @@ function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
   const central = openCentralStore_();
   const published = formRepositoryGetPublished_(payload.formId, central);
+  perfMark_(perf, 'published-form');
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
   const lock = LockService.getScriptLock();
@@ -32,6 +33,7 @@ function registerParticipantOpen(payload) {
 }
 
 function submitParticipantResponse(payload) {
+  const perf = perfStart_('submitParticipantResponse');
   if (!payload || !payload.formId || !payload.teamId || !payload.responseId || !payload.answers || !payload.roundId) {
     throw new Error('Neplatná odpověď formuláře.');
   }
@@ -104,14 +106,20 @@ function submitParticipantResponse(payload) {
     };
   } finally {
     lock.releaseLock();
+    perfEnd_(perf, {formId:(payload&&payload.formId)||''});
   }
 }
 
 function getParticipantRoundView(payload) {
+  const perf = perfStart_('getParticipantRoundView');
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
   const central = openCentralStore_();
   const published = formRepositoryGetPublished_(payload.formId, central);
-  if (!published || !published.schema) return {status:'unavailable'};
+  perfMark_(perf, 'published-form');
+  if (!published || !published.schema) {
+    perfEnd_(perf, {formId:payload.formId,status:'unavailable'});
+    return {status:'unavailable'};
+  }
 
   const rounds = schemaRounds_(published.schema);
   if (!rounds.length) return {status:'unavailable'};
@@ -175,6 +183,7 @@ function getParticipantRoundView(payload) {
     };
   } finally {
     lock.releaseLock();
+    perfEnd_(perf, {formId:(payload&&payload.formId)||''});
   }
 }
 
@@ -460,10 +469,13 @@ function applyRuntimeDelta_(central, formId, rounds, delta) {
 }
 
 function getSessionView(formId) {
+  const perf = perfStart_('getSessionView');
   if (!formId) throw new Error('Chybí form_id.');
 
   const central = openCentralStore_();
+  perfMark_(perf, 'central-open');
   const published = formRepositoryGetPublished_(formId, central);
+  perfMark_(perf, 'published-form');
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
   const rounds = schemaRounds_(published.schema);
@@ -538,7 +550,7 @@ function getSessionView(formId) {
     };
   });
 
-  return {
+  const result = {
     formId:formId,
     schema:published.schema,
     publishedAt:published.publishedAt || '',
@@ -548,13 +560,19 @@ function getSessionView(formId) {
     spreadsheetUrl:spreadsheetUrl,
     revision:getSessionRevisionToken_(formId)
   };
+  perfEnd_(perf, {formId:formId,teams:teams.length,rounds:roundViews.length});
+  return result;
 }
 
 function getHomeFormSummaries() {
+  const perf = perfStart_('getHomeFormSummaries');
   const central = openCentralStore_();
+  perfMark_(perf, 'central-open');
   const forms = formRepositoryList_(central);
+  perfMark_(perf, 'forms-read', {count:forms.length});
   const registry = getFormDataRegistryStore_(central);
   const runtimeByForm = formRuntimeRepositoryMap_(central);
+  perfMark_(perf, 'runtime-read', {count:Object.keys(runtimeByForm).length});
   const dataByForm = {};
 
   if (registry && registry.getLastRow() > 1) {
@@ -579,7 +597,8 @@ function getHomeFormSummaries() {
     });
   }
 
-  return forms.map(form => {
+  let backfilled = 0;
+  const result = forms.map(form => {
     const data = dataByForm[form.formId] || null;
     const schemas = schemaByForm[form.formId] || {};
     const effectiveSchema = schemas.publishedSchema || schemas.draftSchema || null;
@@ -593,6 +612,7 @@ function getHomeFormSummaries() {
         const target = SpreadsheetApp.openById(data.spreadsheetId);
         runtime = ensureRuntimeSummaryForForm_(central, form.formId, effectiveSchema, target);
         runtimeByForm[form.formId] = runtime;
+        backfilled += 1;
       } catch (error) {}
     }
 
@@ -627,6 +647,8 @@ function getHomeFormSummaries() {
       rounds:roundSummary
     });
   });
+  perfEnd_(perf, {forms:forms.length,backfilled:backfilled});
+  return result;
 }
 
 function getOrCreateFormDataUrl(formId) {
