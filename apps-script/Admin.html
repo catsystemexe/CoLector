@@ -379,6 +379,7 @@ function renderFieldCard(round,field){
 
 function renderEditor(){
   syncLegacyAliases();
+  const resetButton=document.querySelector('.editor-reset');
   roundsRoot.innerHTML='';
   state.rounds.forEach((round,index)=>{
     const section=document.createElement('section');section.className='editor-canvas round-editor';section.dataset.roundId=round.id;
@@ -399,6 +400,10 @@ function renderEditor(){
     addWrap.append(button,menu);section.append(addWrap);roundsRoot.append(section);
     requestAnimationFrame(()=>{instructions.style.height='auto';instructions.style.height=instructions.scrollHeight+'px'});
   });
+  if(resetButton){
+    const firstRound=roundsRoot.querySelector('.round-editor');
+    if(firstRound)firstRound.appendChild(resetButton);
+  }
 }
 
 function renderPreview(){
