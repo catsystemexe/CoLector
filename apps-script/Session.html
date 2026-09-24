@@ -675,7 +675,16 @@
         if(showBusy)hideLoader();
       }).withFailureHandler(error=>{
         if(showBusy)hideLoader();
-        if(!sessionData)contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+((error&&error.message)||'Zkuste stránku obnovit.')+'</div>';
+        const message=String((error&&error.message)||'');
+        if(message.includes('Formulář není publikovaný')){
+          try{sessionStorage.removeItem(SESSION_CACHE_KEY)}catch(cacheError){}
+          sessionData=null;
+          sessionRevision='';
+          sheetButton.disabled=true;
+          contentEl.innerHTML='<div class="empty"><strong>Session není dostupná</strong>Session byla smazána nebo formulář není publikovaný.</div>';
+          return;
+        }
+        if(!sessionData)contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+(message||'Zkuste stránku obnovit.')+'</div>';
       }).getSessionView(FORM_ID);
     }
 
