@@ -33,7 +33,7 @@
       right:0;
       height:var(--header);
       display:grid;
-      grid-template-columns:auto auto;
+      grid-template-columns:auto auto minmax(0,1fr);
       justify-content:start;
       align-items:center;
       gap:10px;
@@ -67,6 +67,13 @@
     .session-count .submitted-count{font-size:25px;color:#23975b}
     .session-count .count-sep{font-size:19px;color:#9aa4b5;font-weight:700}
     .session-count .distributed-count{font-size:25px;color:#2671d9}
+    .round-controls{min-width:0;display:flex;align-items:center;gap:6px;overflow-x:auto;padding:2px 0 2px 4px;scrollbar-width:none}
+    .round-controls::-webkit-scrollbar{display:none}
+    .round-lock{flex:0 0 auto;height:38px;min-width:48px;padding:0 9px;border:1px solid #dfe5ee;border-radius:12px;background:#f7f8fb;color:#7b8699;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-weight:900;cursor:pointer}
+    .round-lock svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .round-lock.open{background:#edf9f1;border-color:#c9e8d5;color:#27845d}
+    .round-lock.focused{box-shadow:0 0 0 2px rgba(7,158,174,.16)}
+    .round-lock:disabled{opacity:.5;cursor:default}
 
     /* CONTENT */
     main{
@@ -365,6 +372,7 @@
       <span class="count-sep">/</span>
       <span id="distributedCount" class="distributed-count">0</span>
     </div>
+    <div id="roundControls" class="round-controls" aria-label="Roundy"></div>
 
   </header>
 
@@ -421,6 +429,7 @@
 
     const submittedCountEl=document.getElementById('submittedCount');
     const distributedCountEl=document.getElementById('distributedCount');
+    const roundControlsEl=document.getElementById('roundControls');
     const contentEl=document.getElementById('content');
     const qrScreen=document.getElementById('qrScreen');
     const qrBox=document.getElementById('qrBox');
@@ -429,10 +438,12 @@
 
     let sessionData=null;
     let selectedTeamId='';
+    let focusedRoundId='';
 
     function goHome(){window.top.location.href=APP_URL+'?view=home'}
     function participantUrl(){return APP_URL+'?view=form&form='+encodeURIComponent(FORM_ID)}
     function safeAccent(value){return ['blue','green','purple','orange','red'].includes(value)?value:'blue'}
+    function lockSvg(open){return open?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'}
 
     function showLoader(text){
       const overlay=document.getElementById('loadingOverlay');
@@ -443,7 +454,6 @@
       requestAnimationFrame(()=>overlay.classList.remove('hidden'));
       overlay.setAttribute('aria-busy','true');
     }
-
     function hideLoader(){
       const overlay=document.getElementById('loadingOverlay');
       if(!overlay)return;
@@ -452,213 +462,127 @@
       setTimeout(()=>{overlay.style.display='none'},180);
     }
 
+    function currentRound(){
+      const rounds=(sessionData&&sessionData.rounds)||[];
+      return rounds.find(round=>round.roundId===focusedRoundId)||rounds[0]||null;
+    }
+
+    function renderRoundControls(){
+      roundControlsEl.innerHTML='';
+      const rounds=(sessionData&&sessionData.rounds)||[];
+      rounds.forEach(round=>{
+        const button=document.createElement('button');
+        button.type='button';
+        button.className='round-lock'+(round.unlocked?' open':'')+(round.roundId===focusedRoundId?' focused':'');
+        button.title=(round.unlocked?'Zamknout':'Odemknout')+' Round '+round.number;
+        button.setAttribute('aria-label',button.title);
+        button.innerHTML=lockSvg(round.unlocked)+'<span>'+round.number+'</span>';
+        button.onclick=()=>{
+          focusedRoundId=round.roundId;
+          renderRoundControls();renderCounts();renderSelectedTeam();
+          button.disabled=true;
+          google.script.run.withSuccessHandler(()=>loadSession(false)).withFailureHandler(error=>{button.disabled=false;alert((error&&error.message)||'Stav Roundu se nepodařilo změnit.')}).setRoundLock({formId:FORM_ID,roundId:round.roundId,unlocked:!round.unlocked});
+        };
+        roundControlsEl.append(button);
+      });
+    }
+
     function renderCounts(){
-      const teams=(sessionData&&sessionData.teams)||[];
-      const submitted=teams.filter(team=>team.submitted).length;
-      submittedCountEl.textContent=String(submitted);
-      distributedCountEl.textContent=String(teams.length);
+      const round=currentRound();
+      submittedCountEl.textContent=String(round?Number(round.submittedCount)||0:0);
+      distributedCountEl.textContent=String(round?Number(round.distributedCount)||0:((sessionData&&sessionData.teams)||[]).length);
     }
 
-    function fieldTitle(field){
-      const el=document.createElement('div');
-      el.className='field-title';
-      el.textContent=field.label||'';
-      return el;
-    }
-
+    function fieldTitle(field){const el=document.createElement('div');el.className='field-title';el.textContent=field.label||'';return el}
     function renderField(field,answers){
-      const wrap=document.createElement('section');
-      wrap.className='field accent-'+safeAccent(field.accent);
-      if(field.label)wrap.appendChild(fieldTitle(field));
-
-      const value=answers ? answers[field.id] : null;
-
-      if(field.type==='textarea'){
-        const box=document.createElement('div');
-        box.className='answer-text';
-        box.textContent=value==null?'':String(value);
-        wrap.appendChild(box);
-        return wrap;
-      }
-
+      const wrap=document.createElement('section');wrap.className='field accent-'+safeAccent(field.accent);if(field.label)wrap.appendChild(fieldTitle(field));
+      const value=answers?answers[field.id]:null;
+      if(field.type==='textarea'){const box=document.createElement('div');box.className='answer-text';box.textContent=value==null?'':String(value);wrap.appendChild(box);return wrap}
       if(field.type==='checkbox'){
-        const checks=document.createElement('div');
-        checks.className='checks';
-        const selected=Array.isArray(value)?value.map(String):[];
-
-        (field.options||[]).forEach(option=>{
-          const optionId=String(option.id||option.label||'');
-          const row=document.createElement('div');
-          row.className='check'+(selected.includes(optionId)?' selected':'');
-
-          const box=document.createElement('span');
-          box.className='check-box';
-          box.textContent=selected.includes(optionId)?'✓':'';
-
-          const text=document.createElement('span');
-          text.textContent=option.label||'';
-          row.append(box,text);
-          checks.appendChild(row);
-        });
-
-        wrap.appendChild(checks);
-        return wrap;
+        const checks=document.createElement('div');checks.className='checks';const selected=Array.isArray(value)?value.map(String):[];
+        (field.options||[]).forEach(option=>{const optionId=String(option.id||option.label||'');const row=document.createElement('div');row.className='check'+(selected.includes(optionId)?' selected':'');const box=document.createElement('span');box.className='check-box';box.textContent=selected.includes(optionId)?'✓':'';const text=document.createElement('span');text.textContent=option.label||'';row.append(box,text);checks.appendChild(row)});
+        wrap.appendChild(checks);return wrap;
       }
-
       if(field.type==='yes_no'){
-        const group=document.createElement('div');
-        group.className='yesno';
-        [{value:'yes',label:'Ano'},{value:'no',label:'Ne'}].forEach(item=>{
-          const el=document.createElement('div');
-          el.className='yesno-item'+(String(value||'')===item.value?' selected':'');
-          el.textContent=item.label;
-          group.appendChild(el);
-        });
-        wrap.appendChild(group);
-        return wrap;
+        const group=document.createElement('div');group.className='yesno';
+        [{value:'yes',label:'Ano'},{value:'no',label:'Ne'}].forEach(item=>{const el=document.createElement('div');el.className='yesno-item'+(String(value||'')===item.value?' selected':'');el.textContent=item.label;group.appendChild(el)});
+        wrap.appendChild(group);return wrap;
       }
-
       return null;
     }
 
     function renderSelectedTeam(){
       if(!sessionData)return;
+      const round=currentRound();
+      if(!round){contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong></div>';return}
 
-      const team=sessionData.teams.find(item=>item.teamId===selectedTeamId);
-      const response=sessionData.answersByTeam[selectedTeamId];
+      const eligible=(sessionData.teams||[]).filter(team=>(team.completedRoundIds||[]).includes(round.roundId));
+      if(selectedTeamId&&!eligible.some(team=>team.teamId===selectedTeamId))selectedTeamId='';
+      if(!selectedTeamId&&eligible.length)selectedTeamId=eligible[0].teamId;
 
-      if(!team || !team.submitted || !response){
-        contentEl.innerHTML='<div class="empty"><strong>Session je připravená</strong>Odevzdaná karta se zobrazí automaticky po odeslání.</div>';
+      const team=(sessionData.teams||[]).find(item=>item.teamId===selectedTeamId);
+      const response=team&&sessionData.answersByTeamRound&&sessionData.answersByTeamRound[team.teamId]?sessionData.answersByTeamRound[team.teamId][round.roundId]:null;
+
+      if(!team||!response){
+        contentEl.innerHTML='<div class="empty"><strong>Round '+round.number+' čeká na odevzdání</strong>'+(round.unlocked?'Participantům je Round otevřený.':'Round je momentálně zamčený.')+'</div>';
         return;
       }
 
-      const schema=sessionData.schema||{};
       contentEl.innerHTML='';
-
-      const sheet=document.createElement('section');
-      sheet.className='sheet';
-
-      const head=document.createElement('div');
-      head.className='sheet-head';
-
-      const title=document.createElement('h1');
-      title.className='sheet-title';
-      title.textContent=schema.title||schema.internalTitle||team.teamLabel;
-
-      const teamInfo=document.createElement('div');
-      teamInfo.className='sheet-team';
-      teamInfo.textContent=team.teamLabel+' — odevzdáno';
-
+      const sheet=document.createElement('section');sheet.className='sheet';
+      const head=document.createElement('div');head.className='sheet-head';
+      const title=document.createElement('h1');title.className='sheet-title';title.textContent=round.title||(sessionData.schema&&sessionData.schema.internalTitle)||team.teamLabel;
+      const teamInfo=document.createElement('div');teamInfo.className='sheet-team';teamInfo.textContent=team.teamLabel+' — Round '+round.number+' odevzdán';
       head.append(title,teamInfo);
-
-      if(schema.instructions){
-        const instructions=document.createElement('p');
-        instructions.className='instructions';
-        instructions.textContent=schema.instructions;
-        head.appendChild(instructions);
-      }
-
+      if(round.instructions){const instructions=document.createElement('p');instructions.className='instructions';instructions.textContent=round.instructions;head.appendChild(instructions)}
       sheet.appendChild(head);
-
-      const fields=document.createElement('div');
-      fields.className='fields';
-      (schema.fields||[]).forEach(field=>{
-        const rendered=renderField(field,response.answers||{});
-        if(rendered)fields.appendChild(rendered);
-      });
-
-      sheet.appendChild(fields);
-      contentEl.appendChild(sheet);
+      const fields=document.createElement('div');fields.className='fields';
+      (round.fields||[]).forEach(field=>{const rendered=renderField(field,response.answers||{});if(rendered)fields.appendChild(rendered)});
+      sheet.appendChild(fields);contentEl.appendChild(sheet);
     }
 
     function renderSession(result){
       sessionData=result;
       sheetButton.disabled=!(result&&result.spreadsheetUrl);
-
-      const submitted=(result.teams||[]).filter(team=>team.submitted);
-      if(selectedTeamId && !submitted.some(team=>team.teamId===selectedTeamId))selectedTeamId='';
-      if(!selectedTeamId && submitted.length)selectedTeamId=submitted[0].teamId;
-
+      const rounds=(result&&result.rounds)||[];
+      if(!focusedRoundId||!rounds.some(round=>round.roundId===focusedRoundId)){
+        const openRounds=rounds.filter(round=>round.unlocked);
+        focusedRoundId=(openRounds.length?openRounds[openRounds.length-1]:rounds[0]||{}).roundId||'';
+      }
+      selectedTeamId='';
+      renderRoundControls();
       renderCounts();
-
       if((result.teams||[]).length===0){
-        contentEl.innerHTML='<div class="empty"><strong>Zatím žádný tým</strong>Po otevření formuláře prvním účastníkem se počítadlo nahoře aktualizuje.</div>';
+        contentEl.innerHTML='<div class="empty"><strong>Zatím žádný participant</strong>Po otevření QR kódu se počítadlo nahoře aktualizuje.</div>';
         return;
       }
-
       renderSelectedTeam();
     }
 
     function loadSession(showBusy){
       if(showBusy)showLoader('Collecting…');
-      google.script.run
-        .withSuccessHandler(result=>{
-          renderSession(result);
-          if(showBusy)hideLoader();
-        })
-        .withFailureHandler(error=>{
-          if(showBusy)hideLoader();
-          contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+((error&&error.message)||'Zkuste stránku obnovit.')+'</div>';
-        })
-        .getSessionView(FORM_ID);
+      google.script.run.withSuccessHandler(result=>{renderSession(result);if(showBusy)hideLoader()}).withFailureHandler(error=>{if(showBusy)hideLoader();contentEl.innerHTML='<div class="empty"><strong>Session se nepodařilo načíst</strong>'+((error&&error.message)||'Zkuste stránku obnovit.')+'</div>'}).getSessionView(FORM_ID);
     }
 
     function loadQrLibrary(){
       if(window.QRCode)return Promise.resolve();
-      return new Promise((resolve,reject)=>{
-        const existing=document.querySelector('script[data-colector-qr]');
-        if(existing){
-          existing.addEventListener('load',resolve,{once:true});
-          existing.addEventListener('error',reject,{once:true});
-          return;
-        }
-        const script=document.createElement('script');
-        script.src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js';
-        script.dataset.colectorQr='1';
-        script.onload=resolve;
-        script.onerror=reject;
-        document.head.appendChild(script);
-      });
+      return new Promise((resolve,reject)=>{const existing=document.querySelector('script[data-colector-qr]');if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return}const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js';script.dataset.colectorQr='1';script.onload=resolve;script.onerror=reject;document.head.appendChild(script)});
     }
-
     function showQr(){
       if(!sessionData)return;
-      qrTitle.textContent=sessionData.schema.title||sessionData.schema.internalTitle||'Formulář';
-      qrBox.innerHTML='';
-      qrScreen.classList.add('open');
-
-      loadQrLibrary().then(()=>{
-        const size=Math.max(220,Math.min(480,Math.floor(Math.min(window.innerWidth*.72,window.innerHeight*.60))));
-        new QRCode(qrBox,{
-          text:participantUrl(),
-          width:size,
-          height:size,
-          colorDark:'#111827',
-          colorLight:'#ffffff',
-          correctLevel:QRCode.CorrectLevel.M
-        });
-      }).catch(()=>{qrBox.textContent='QR kód se nepodařilo načíst.'});
+      const first=(sessionData.rounds||[])[0];
+      qrTitle.textContent=(first&&first.title)||(sessionData.schema&&sessionData.schema.internalTitle)||'Formulář';
+      qrBox.innerHTML='';qrScreen.classList.add('open');
+      loadQrLibrary().then(()=>{const size=Math.max(220,Math.min(480,Math.floor(Math.min(window.innerWidth*.72,window.innerHeight*.60))));new QRCode(qrBox,{text:participantUrl(),width:size,height:size,colorDark:'#111827',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M})}).catch(()=>{qrBox.textContent='QR kód se nepodařilo načíst.'});
     }
 
     document.getElementById('homeBrand').onclick=goHome;
-    document.getElementById('homeBrand').onkeydown=e=>{
-      if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}
-    };
+    document.getElementById('homeBrand').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}};
     document.getElementById('qrButton').onclick=showQr;
     document.getElementById('qrClose').onclick=()=>qrScreen.classList.remove('open');
-    sheetButton.onclick=()=>{
-      if(sessionData&&sessionData.spreadsheetUrl){
-        window.open(sessionData.spreadsheetUrl,'_blank','noopener');
-      }
-    };
+    sheetButton.onclick=()=>{if(sessionData&&sessionData.spreadsheetUrl)window.open(sessionData.spreadsheetUrl,'_blank','noopener')};
 
-    if(!FORM_ID){
-      hideLoader();
-      contentEl.innerHTML='<div class="empty"><strong>Chybí formulář</strong></div>';
-    }else{
-      loadSession(true);
-      setInterval(()=>loadSession(false),3000);
-    }
+    if(!FORM_ID){hideLoader();contentEl.innerHTML='<div class="empty"><strong>Chybí formulář</strong></div>'}else{loadSession(true);setInterval(()=>loadSession(false),3000)}
   </script>
 </body>
 </html>
