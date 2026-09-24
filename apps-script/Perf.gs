@@ -1,4 +1,4 @@
-const PERF_LOG_ENABLED = true;
+const PERF_LOG_ENABLED = false;
 
 function perfStart_(operation) {
   return {
