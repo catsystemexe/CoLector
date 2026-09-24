@@ -2,81 +2,28 @@ const TEMPLATES_SHEET = 'TEMPLATES';
 const TEMPLATE_HEADERS = ['template_id','internal_title','public_title','schema_json','created_at','updated_at'];
 
 function listTemplates() {
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateTemplatesSheet_(spreadsheet);
-  if (sheet.getLastRow() < 2) return [];
-
-  return sheet.getRange(2, 1, sheet.getLastRow() - 1, TEMPLATE_HEADERS.length).getValues()
-    .map(row => {
-      let schema = {};
-      try { schema = JSON.parse(String(row[3] || '{}')); } catch (error) {}
-      return {
-        templateId: String(row[0] || ''),
-        internalTitle: String(row[1] || ''),
-        title: String(row[2] || ''),
-        createdAt: row[4] ? new Date(row[4]).toISOString() : '',
-        updatedAt: row[5] ? new Date(row[5]).toISOString() : '',
-        fieldCount: Array.isArray(schema.fields) ? schema.fields.length : 0
-      };
-    })
-    .filter(item => item.templateId)
-    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  return templateRepositoryList_(openCentralStore_());
 }
 
 function getTemplateDraft(templateId) {
   if (!templateId) throw new Error('Chybí template_id.');
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateTemplatesSheet_(spreadsheet);
-  const rowIndex = findTemplateRow_(sheet, templateId);
-  if (!rowIndex) return null;
-
-  const row = sheet.getRange(rowIndex, 1, 1, TEMPLATE_HEADERS.length).getValues()[0];
-  let schema = {};
-  try { schema = JSON.parse(String(row[3] || '{}')); } catch (error) {}
-  return {
-    templateId: String(row[0] || ''),
-    schema: schema,
-    createdAt: row[4] ? new Date(row[4]).toISOString() : '',
-    updatedAt: row[5] ? new Date(row[5]).toISOString() : ''
-  };
+  return templateRepositoryGet_(templateId, openCentralStore_());
 }
 
 function saveTemplateDraft(payload) {
   if (!payload || !payload.templateId || !payload.schema) throw new Error('Neplatná šablona.');
-
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateTemplatesSheet_(spreadsheet);
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-
   try {
-    const now = new Date();
-    const rowIndex = findTemplateRow_(sheet, payload.templateId);
-    const existing = rowIndex ? sheet.getRange(rowIndex, 1, 1, TEMPLATE_HEADERS.length).getValues()[0] : [];
-    const schema = JSON.parse(JSON.stringify(payload.schema));
-    schema.templateId = payload.templateId;
-    delete schema.formId;
-
-    const row = [
-      payload.templateId,
-      String(schema.internalTitle || 'Nová šablona'),
-      String(schema.title || ''),
-      JSON.stringify(schema),
-      existing[4] || now,
-      now
-    ];
-
-    if (rowIndex) sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-    else sheet.appendRow(row);
-
-    return {ok:true, templateId:payload.templateId, updatedAt:now.toISOString()};
+    return templateRepositorySave_(payload, openCentralStore_());
   } finally {
     lock.releaseLock();
   }
 }
 
 function duplicateTemplateDraft(templateId) {
-  const source = getTemplateDraft(templateId);
+  const central = openCentralStore_();
+  const source = templateRepositoryGet_(templateId, central);
   if (!source || !source.schema) throw new Error('Šablona nebyla nalezena.');
 
   const copy = JSON.parse(JSON.stringify(source.schema));
@@ -85,14 +32,20 @@ function duplicateTemplateDraft(templateId) {
   copy.internalTitle = (copy.internalTitle || 'Šablona') + ' — kopie';
   delete copy.formId;
 
-  saveTemplateDraft({templateId:newId, schema:copy});
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    templateRepositorySave_({templateId:newId, schema:copy}, central);
+  } finally {
+    lock.releaseLock();
+  }
   return {ok:true, templateId:newId};
 }
 
 function deleteTemplateDraft(templateId) {
   if (!templateId) throw new Error('Chybí template_id.');
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateTemplatesSheet_(spreadsheet);
+  const sheet = getTemplatesStore_(openCentralStore_());
+  if (!sheet) return {ok:true, deleted:false};
   const rowIndex = findTemplateRow_(sheet, templateId);
   if (!rowIndex) return {ok:true, deleted:false};
   sheet.deleteRow(rowIndex);
@@ -100,7 +53,8 @@ function deleteTemplateDraft(templateId) {
 }
 
 function createFormFromTemplate(templateId) {
-  const source = getTemplateDraft(templateId);
+  const central = openCentralStore_();
+  const source = templateRepositoryGet_(templateId, central);
   if (!source || !source.schema) throw new Error('Šablona nebyla nalezena.');
 
   const schema = JSON.parse(JSON.stringify(source.schema));
@@ -109,18 +63,19 @@ function createFormFromTemplate(templateId) {
   schema.formId = formId;
   schema.internalTitle = String(schema.internalTitle || 'Nový formulář');
 
-  saveFormDraft({formId:formId, schema:schema});
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    formRepositorySaveDraft_({formId:formId, schema:schema}, central);
+  } finally {
+    lock.releaseLock();
+  }
   return {ok:true, formId:formId};
 }
 
 function getOrCreateTemplatesSheet_(spreadsheet) {
-  let sheet = spreadsheet.getSheetByName(TEMPLATES_SHEET);
-  if (!sheet) {
-    sheet = spreadsheet.insertSheet(TEMPLATES_SHEET);
-    sheet.getRange(1, 1, 1, TEMPLATE_HEADERS.length).setValues([TEMPLATE_HEADERS]);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
+  // Compatibility alias for legacy mutating paths. Read paths must use getTemplatesStore_().
+  return ensureTemplatesStore_(spreadsheet);
 }
 
 function findTemplateRow_(sheet, templateId) {
