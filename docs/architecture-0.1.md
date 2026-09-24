@@ -223,3 +223,63 @@ CoLector 0.1 je úspěšný, pokud během reálného školení:
 ## 14. Produktová definice 0.1
 
 CoLector 0.1 umožní lektorovi vytvořit jednoduchý digitální formulář, automaticky k němu připravit human-readable Google Sheet, distribuovat formulář všem týmům jedním QR kódem a sesbírat jejich odpovědi online nebo offline QR přenosem tak, aby každý tým tvořil jeden řádek a každá položka formuláře jeden sloupec.
+
+
+## 15. Přechodová výkonová architektura
+
+Optimalizační větev odděluje aplikační logiku od konkrétní implementace úložiště tak, aby současný Google Apps Script zůstal použitelný a zároveň se snížila cena budoucí migrace.
+
+### Repository boundary
+
+Přístupy k Google Sheets jsou soustředěné do repository/storage vrstvy:
+
+```text
+UI / google.script.run
+        ↓
+public application functions
+        ↓
+repositories
+        ↓
+Google Sheets / PropertiesService
+```
+
+Read cesty strukturu pouze čtou. Vytváření, oprava hlaviček a inicializace listů patří do explicitních mutačních `ensure*` cest.
+
+### Role Google Sheets
+
+Google Sheet konkrétního formuláře zůstává kanonickým uživatelským datasetem a produkčním výstupem:
+
+- `ODPOVĚDI` je čitelná pracovní tabulka,
+- uživatel ji může dále upravovat, kopírovat a exportovat,
+- technické listy jsou implementační detail a mohou být později přesunuty do jiné systémové databáze.
+
+Google Sheets tedy není nutné odstranit při budoucí migraci webu; může zůstat uživatelským datovým sinkem, zatímco interní systémový stav se přesune do databáze.
+
+### Materializovaný runtime read model
+
+Home již nemá při každém načtení otevírat datový Sheet každého formuláře. Centrální `FORM_RUNTIME` drží materializované souhrny:
+
+- počet participantů,
+- počet kompletních odevzdání,
+- distributed/submitted counts po jednotlivých Parts,
+- revision a čas aktualizace.
+
+Starší formuláře bez runtime záznamu se jednorázově dopočítají ze stávajících technických dat. Následné změny aktualizují runtime inkrementálně.
+
+### Session refresh
+
+Session nepřenáší celý dataset v pravidelném intervalu. Klient polluje pouze lehký revision token; celý session snapshot se načte znovu jen při změně revision.
+
+Pokud je Part locking vypnutý, participant klient neprovádí polling lock state.
+
+### Migrační záměr
+
+Při budoucím přesunu mimo Apps Script se má měnit zejména repository/storage implementace:
+
+```text
+Google Sheets system store
+        ↓
+PostgreSQL / jiná databáze
+```
+
+Aplikační kontrakty a uživatelský Google Sheet výstup mají zůstat co nejstabilnější.
