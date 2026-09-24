@@ -61,6 +61,7 @@
   <script>
     const APP_URL=<?!= JSON.stringify(appUrl) ?>,recentFormsEl=document.getElementById('recentForms'),formsCountEl=document.getElementById('formsCount'),qrScreen=document.getElementById('qrScreen'),qrBox=document.getElementById('qrBox'),qrTitle=document.getElementById('qrTitle');
     const PART_LOCK_UI_ENABLED=false;
+    const HOME_CACHE_KEY='colector.home.summaries.v1';
     const go=q=>window.top.location.href=APP_URL+q;
     const participantUrl=id=>APP_URL+'?view=form&form='+encodeURIComponent(id);
     const fmt=v=>{if(!v)return'';const d=new Date(v);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}).format(d)};
@@ -215,13 +216,37 @@
       });
     }
 
-    function load(){google.script.run.withSuccessHandler(forms=>{render(forms);hideLoader()}).withFailureHandler(()=>{recentFormsEl.innerHTML='<div class="empty">Formuláře se nepodařilo načíst.</div>';hideLoader()}).getHomeFormSummaries()}
+    function readHomeCache(){
+      try{
+        const raw=sessionStorage.getItem(HOME_CACHE_KEY);
+        if(!raw)return null;
+        const parsed=JSON.parse(raw);
+        return Array.isArray(parsed)?parsed:null;
+      }catch(error){return null}
+    }
+    function writeHomeCache(forms){
+      try{sessionStorage.setItem(HOME_CACHE_KEY,JSON.stringify(Array.isArray(forms)?forms:[]))}catch(error){}
+    }
+    function load(){
+      google.script.run
+        .withSuccessHandler(forms=>{writeHomeCache(forms);render(forms);hideLoader()})
+        .withFailureHandler(()=>{
+          if(!recentFormsEl.children.length)recentFormsEl.innerHTML='<div class="empty">Formuláře se nepodařilo načíst.</div>';
+          hideLoader();
+        })
+        .getHomeFormSummaries()
+    }
     document.addEventListener('pointerdown',e=>{if(openSwipe&&!openSwipe.contains(e.target))closeSwipe(openSwipe)});
     document.getElementById('homeBrand').onclick=()=>go('?view=home');
     document.getElementById('navTemplates').onclick=()=>go('?view=forms');
     document.getElementById('navData').onclick=()=>go('?view=data');
     document.getElementById('newForm').onclick=()=>go('?view=forms&mode=new-form');
     document.getElementById('qrClose').onclick=()=>qrScreen.classList.remove('open');
+    const cachedHome=readHomeCache();
+    if(cachedHome){
+      render(cachedHome);
+      hideLoader();
+    }
     load();
   </script>
 </body>
