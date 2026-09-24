@@ -25,25 +25,41 @@
 .form-main{position:relative;min-width:0;width:100%;min-height:70px;border:0;background:transparent;text-align:left;padding:11px var(--part-space,48px) 11px 14px;color:#27334a;cursor:pointer;display:flex;flex-direction:column;justify-content:center}
 .form-title{position:relative;z-index:1;font-weight:740;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .form-meta{position:relative;z-index:1;margin-top:5px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px;white-space:nowrap}
-.total-participants{font-weight:780;color:#657086}
+.total-progress{display:inline-flex;align-items:baseline;gap:2px;font-weight:850}
+.total-progress .distributed{color:#2671d9}
+.total-progress .sep{color:#9aa4b5}
+.total-progress .selected{color:#23975b}
 .form-edit-watermark{position:absolute;right:calc(var(--part-space,48px) + 8px);top:50%;transform:translateY(-50%) rotate(-7deg);width:43px;height:43px;color:#aeb8c8;opacity:.20;pointer-events:none}
 .form-edit-watermark svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.55}
-.part-controls{position:absolute;z-index:4;right:7px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px}
-.part-chip{position:relative;width:48px;height:56px;border:1px solid #dfe5ee;border-radius:12px;background:#f7f8fb;color:#657086;padding:3px 3px 4px;display:grid;grid-template-rows:1fr auto;align-items:center;justify-items:center;overflow:hidden}
-.part-chip.open{background:#edf9f1;border-color:#c9e8d5;color:#27845d}
+
+/* single-Part lock */
+.single-lock{position:absolute;z-index:4;right:0;top:0;bottom:0;width:64px;border:0;background:transparent;color:#8a94a6;display:grid;place-items:center;padding:0}
+.single-lock svg{width:31px;height:31px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.single-lock.open{color:#27845d}
+.single-lock.open svg{opacity:.24}
+.single-lock.closed svg{opacity:.92}
+.single-lock.show-lock svg{opacity:1;transform:scale(1.08)}
+.single-lock:disabled{cursor:default;opacity:.5}
+
+/* multi-Part zones */
+.part-controls{position:absolute;z-index:4;right:0;top:0;bottom:0;display:flex;align-items:stretch}
+.part-chip{position:relative;width:52px;height:100%;min-height:68px;border:0;border-radius:0;background:transparent;color:#657086;padding:0 4px 6px;display:grid;grid-template-rows:1fr auto;align-items:center;justify-items:center;overflow:hidden}
+.part-chip.open{background:rgba(47,151,91,.065);color:#27845d}
 .part-chip:disabled{cursor:default;opacity:.72}
-.part-letter{font-size:22px;line-height:1;font-weight:900}
-.part-stats{display:flex;align-items:baseline;gap:1px;font-size:9.5px;font-weight:850;line-height:1;letter-spacing:-.02em}
+.part-letter{position:relative;z-index:1;align-self:center;font-size:25px;line-height:1;font-weight:900}
+.part-stats{position:relative;z-index:1;display:flex;align-items:baseline;gap:1px;font-size:9.5px;font-weight:850;line-height:1;letter-spacing:-.02em}
 .part-stats .selected{color:#23975b}
 .part-stats .sep{color:#9aa4b5}
 .part-stats .distributed{color:#2671d9}
-.part-lock-overlay{position:absolute;inset:0;display:grid;place-items:center;background:inherit;color:inherit;opacity:0;transform:scale(.86);transition:opacity .12s ease,transform .12s ease;pointer-events:none}
-.part-lock-overlay svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.part-lock-overlay{position:absolute;z-index:2;inset:0;display:grid;place-items:center;background:transparent;color:currentColor;opacity:0;transform:scale(.90);transition:opacity .12s ease,transform .12s ease;pointer-events:none}
+.part-lock-overlay svg{width:29px;height:29px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.78}
 .part-chip.show-lock .part-lock-overlay{opacity:1;transform:scale(1)}
+.part-chip.show-lock .part-letter{opacity:.48}
 @media(max-width:520px){
-  .part-chip{width:44px;height:54px}
-  .part-letter{font-size:20px}
+  .part-chip{width:48px}
+  .part-letter{font-size:23px}
   .part-stats{font-size:9px}
+  .single-lock{width:58px}
 }
 .empty{padding:24px 18px;background:#fff;border:1px solid var(--line);border-radius:16px;color:var(--muted);text-align:center}.home-bottom-dock{position:fixed;z-index:45;left:0;right:0;bottom:0;padding:30px 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(244,246,251,0),rgba(244,246,251,.95) 28%,#f4f6fb 52%)}.home-bottom-inner{width:min(100%,620px);margin:0 auto}.new-form{width:100%;min-height:84px;border:0;border-radius:28px;background:linear-gradient(135deg,#12B8B5,#069EAE 55%,#087CA8);color:#fff;font-size:21px;font-weight:820;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 24px rgba(7,158,174,.22)}.new-form .plus{font-size:34px;font-weight:400;line-height:1}.loading-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.96);opacity:1;transition:opacity 180ms ease}.loading-overlay.hidden{opacity:0;pointer-events:none}.loading-box{display:flex;flex-direction:column;align-items:center;gap:14px}.colector-loader,.colector-loader-svg{width:120px;height:120px}.loader-layer{transform-box:fill-box;transform-origin:center;opacity:0}.loader-layer-top{animation:top 2.2s ease-in-out infinite}.loader-layer-middle{animation:middle 2.2s ease-in-out infinite}.loader-layer-bottom{animation:bottom 2.2s ease-in-out infinite}.loading-text{font-size:16px;font-weight:650;color:#27334a}@keyframes top{0%{transform:translateY(-16px);opacity:0}22%{transform:translateY(0);opacity:1}48%{opacity:1}84%,100%{transform:translateY(30px);opacity:0}}@keyframes middle{0%,14%{transform:translateY(-14px);opacity:0}36%{transform:translateY(0);opacity:1}48%{opacity:1}88%,100%{transform:translateY(30px);opacity:0}}@keyframes bottom{0%,28%{transform:translateY(-12px);opacity:0}48%{transform:translateY(0);opacity:1}56%{opacity:1}92%,100%{transform:translateY(30px);opacity:0}}@media(prefers-reduced-motion:reduce){.loader-layer{animation:none!important;opacity:1;transform:none}}.qr-screen{position:fixed;z-index:100;inset:0;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px}.qr-screen.open{display:flex}.qr-close{position:absolute;top:14px;right:14px;width:44px;height:44px;border:0;border-radius:12px;background:#f1f3f8;color:#556178;font-size:26px}.qr-title{margin:0 0 20px;text-align:center;font-size:26px;color:#27334a}.qr-box{padding:14px;background:#fff;border-radius:18px;box-shadow:0 10px 34px rgba(25,35,58,.12)}@media(max-width:520px){:root{--header:72px;--section:84px}.brand-mark{width:40px;height:40px}.section-name{font-size:12px}.nav-btn{width:50px;height:50px;border-radius:15px}.nav-btn svg{width:25px;height:25px}.header-nav{gap:7px}.section-title{font-size:20px}}
   </style>
@@ -89,7 +105,7 @@
       const max=136;
       card.addEventListener('pointerdown',e=>{
         if(e.button!=null&&e.button!==0)return;
-        if(e.target.closest('.part-chip'))return;
+        if(e.target.closest('.part-chip,.single-lock'))return;
         pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startOffset=shell.dataset.open==='1'?-max:0;dragging=false;
         card.setPointerCapture&&card.setPointerCapture(pointerId);
       });
@@ -121,9 +137,38 @@
       card.addEventListener('pointercancel',()=>{if(pointerId!=null){card.classList.remove('dragging');closeSwipe(shell);pointerId=null;dragging=false}});
     }
 
+    function togglePart(form,part,button){
+      if(!form.publishedAt||!part)return;
+      const target=!part.unlocked;
+      button.disabled=true;
+      button.classList.add('show-lock');
+      if(button.classList.contains('part-chip')){
+        const overlay=button.querySelector('.part-lock-overlay');
+        if(overlay)overlay.innerHTML=lockSvg(target);
+      }else{
+        button.innerHTML=lockSvg(target);
+      }
+      google.script.run.withSuccessHandler(()=>setTimeout(load,380)).withFailureHandler(error=>{
+        button.disabled=false;button.classList.remove('show-lock');
+        alert((error&&error.message)||'Stav Partu se nepodařilo změnit.');
+      }).setRoundLock({formId:form.formId,roundId:part.roundId,unlocked:target});
+    }
+
+    function buildSingleLock(form,part){
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='single-lock '+(part&&part.unlocked?'open':'closed');
+      button.title=form.publishedAt?((part&&part.unlocked?'Zamknout':'Odemknout')+' formulář'):'Formulář není publikovaný';
+      button.setAttribute('aria-label',button.title);
+      button.innerHTML=lockSvg(!!(part&&part.unlocked));
+      if(!form.publishedAt||!part)button.disabled=true;
+      else button.onclick=e=>{e.stopPropagation();togglePart(form,part,button)};
+      return button;
+    }
+
     function buildPartControls(form){
       const rounds=Array.isArray(form.rounds)?form.rounds:[];
-      if(!rounds.length)return null;
+      if(rounds.length<=1)return null;
       const root=document.createElement('div');root.className='part-controls';root.onclick=e=>e.stopPropagation();
       rounds.forEach(part=>{
         const letter=partLetter(part.number);
@@ -132,17 +177,8 @@
         button.title=form.publishedAt?((part.unlocked?'Zamknout':'Odemknout')+' Part '+letter):('Part '+letter);
         button.setAttribute('aria-label',button.title+'; '+selected+' vybráno z '+distributed+' rozdaných');
         button.innerHTML='<span class="part-letter">'+letter+'</span><span class="part-stats"><span class="selected">'+selected+'</span><span class="sep">/</span><span class="distributed">'+distributed+'</span></span><span class="part-lock-overlay">'+lockSvg(part.unlocked)+'</span>';
-        if(!form.publishedAt){button.disabled=true}
-        else{
-          button.onclick=e=>{
-            e.stopPropagation();
-            const target=!part.unlocked;
-            const overlay=button.querySelector('.part-lock-overlay');
-            if(overlay)overlay.innerHTML=lockSvg(target);
-            button.classList.add('show-lock');button.disabled=true;
-            google.script.run.withSuccessHandler(()=>{setTimeout(load,420)}).withFailureHandler(error=>{button.disabled=false;button.classList.remove('show-lock');alert((error&&error.message)||'Stav Partu se nepodařilo změnit.')}).setRoundLock({formId:form.formId,roundId:part.roundId,unlocked:target});
-          };
-        }
+        if(!form.publishedAt)button.disabled=true;
+        else button.onclick=e=>{e.stopPropagation();togglePart(form,part,button)};
         root.append(button);
       });
       return root;
@@ -162,7 +198,8 @@
         const collected=Number(form.collectedCount)||0;
         const isDistributed=total>0;
         const rounds=Array.isArray(form.rounds)?form.rounds:[];
-        const partSpace=rounds.length?Math.min(230,rounds.length*52+12):48;
+        const isMulti=rounds.length>1;
+        const partSpace=isMulti?Math.min(230,rounds.length*52):64;
         const row=document.createElement('div');row.className='form-row';if(isDistributed)row.classList.add(collected>=total?'complete':'collecting');
 
         const qr=document.createElement('button');qr.className='form-qr';qr.innerHTML='<svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M15 14h2v2h-2zM19 14h2v4h-2zM14 19h4v2h-4zM20 20h1v1h-1z"/></svg>';
@@ -180,19 +217,34 @@
         const main=document.createElement('div');main.className='form-main';
         main.innerHTML='<div class="form-title"></div><div class="form-meta"><span>'+fmt(form.updatedAt||form.createdAt)+'</span></div>';
         main.querySelector('.form-title').textContent=form.internalTitle||form.title||'Bez názvu';
-        const totalEl=document.createElement('span');totalEl.className='total-participants';totalEl.textContent='Celkem '+total;main.querySelector('.form-meta').append(totalEl);
+
+        if(!isMulti){
+          const part=rounds[0]||null;
+          const distributed=part?Number(part.distributedCount)||0:total;
+          const selected=part?Number(part.submittedCount)||0:collected;
+          const progress=document.createElement('span');progress.className='total-progress';progress.title='Rozdáno / vybráno';
+          progress.innerHTML='<span class="distributed">'+distributed+'</span><span class="sep">/</span><span class="selected">'+selected+'</span>';
+          main.querySelector('.form-meta').append(progress);
+        }else{
+          const totalEl=document.createElement('span');totalEl.className='total-participants';totalEl.textContent='Celkem '+total;main.querySelector('.form-meta').append(totalEl);
+        }
+
         if(!isDistributed){const watermark=document.createElement('span');watermark.className='form-edit-watermark';watermark.innerHTML=pencilSvg;main.append(watermark)}
         card.append(main);
 
-        const parts=buildPartControls(form);if(parts)card.append(parts);
+        if(isMulti){
+          const parts=buildPartControls(form);if(parts)card.append(parts);
+        }else{
+          card.append(buildSingleLock(form,rounds[0]||null));
+        }
 
         const activate=()=>{
           if(card.dataset.suppressClick==='1')return;
           if(shell.dataset.open==='1'){closeSwipe(shell);return}
           go((isDistributed?'?view=session&form=':'?view=editor&form=')+encodeURIComponent(form.formId));
         };
-        card.onclick=e=>{if(e.target.closest('.part-chip'))return;activate()};
-        card.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.part-chip')){e.preventDefault();activate()}};
+        card.onclick=e=>{if(e.target.closest('.part-chip,.single-lock'))return;activate()};
+        card.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.part-chip,.single-lock')){e.preventDefault();activate()}};
 
         installSwipe(shell,card);
         shell.append(actions,card);row.append(qr,shell);recentFormsEl.append(row);
