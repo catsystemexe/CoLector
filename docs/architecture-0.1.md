@@ -272,8 +272,10 @@ Jakmile formulář otevře alespoň jeden participant, považuje se za rozdaný 
 
 - Editor už nesmí ukládat změny schématu,
 - formulář nelze znovu publikovat se změněnou strukturou,
-- rozdaný formulář nelze během aktivní práce smazat,
-- duplikace zůstává povolená, protože vytváří nový nezávislý draft.
+- duplikace zůstává povolená, protože vytváří nový nezávislý draft,
+- session lze smazat z CoLectoru; přidružený Google Sheet s odpověďmi se zachová jako archiv.
+
+Smazání session odstraní aplikační záznamy formuláře, runtime souhrn, registry a session/round stav. Uživatelský Google Sheet se nemaže.
 
 Toto pravidlo chrání konzistenci `ODPOVĚDI`, technických metadat i materializovaného `FORM_RUNTIME` během probíhající Session.
 
