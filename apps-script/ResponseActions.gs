@@ -4,6 +4,8 @@ const FORM_TEAMS_SHEET = '_TEAMS';
 const FORM_TEAMS_HEADERS = ['team_id', 'team_label', 'opened_at', 'submitted_at'];
 const FORM_META_HEADERS = ['timestamp', 'form_id', 'team_id', 'team_label', 'response_id', 'source', 'published_at', 'answers_json', 'round_id'];
 const ROUND_STATE_PREFIX = 'colector.rounds.';
+const FORM_PART_OPENS_SHEET = '_PART_OPENS';
+const FORM_PART_OPENS_HEADERS = ['team_id', 'round_id', 'opened_at'];
 
 function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
@@ -49,11 +51,11 @@ function submitParticipantResponse(payload) {
     const completed = completedRoundIdsForTeam_(target, payload.teamId, rounds);
     const nextRound = rounds.find(round => !completed.includes(round.id));
     if (!nextRound) return {ok:true,duplicate:false,teamLabel:teamLabel,complete:true};
-    if (String(nextRound.id) !== String(payload.roundId)) throw new Error('Tento Round teď není aktivní.');
+    if (String(nextRound.id) !== String(payload.roundId)) throw new Error('Tento Part teď není aktivní.');
 
     const roundStates = getRoundStates_(payload.formId, published.schema);
     const currentState = roundStates.find(round => String(round.roundId) === String(nextRound.id));
-    if (!currentState || !currentState.unlocked) throw new Error('Tento Round je momentálně uzamčený.');
+    if (!currentState || !currentState.unlocked) throw new Error('Tento Part je momentálně uzamčený.');
 
     ensureResponseHeaders_(responses, published.schema);
     upsertTeamResponse_(responses, teamLabel, published.schema, payload.answers);
@@ -122,6 +124,8 @@ function getParticipantRoundView(payload) {
       };
     }
 
+    markPartOpened_(target, payload.teamId, nextRound.id, rounds);
+
     return {
       status:'ready',
       teamLabel:teamLabel,
@@ -145,7 +149,7 @@ function getParticipantRoundView(payload) {
 }
 
 function getRoundLockState(payload) {
-  if (!payload || !payload.formId || !payload.roundId) throw new Error('Neplatný dotaz na Round.');
+  if (!payload || !payload.formId || !payload.roundId) throw new Error('Neplatný dotaz na Part.');
   const properties = PropertiesService.getScriptProperties();
   const key = ROUND_STATE_PREFIX + payload.formId;
   let values = {};
@@ -158,13 +162,13 @@ function getRoundLockState(payload) {
 
 function setRoundLock(payload) {
   if (!payload || !payload.formId || !payload.roundId || typeof payload.unlocked !== 'boolean') {
-    throw new Error('Neplatná změna Roundu.');
+    throw new Error('Neplatná změna Partu.');
   }
   const published = getPublishedForm(payload.formId);
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
   const rounds = schemaRounds_(published.schema);
-  if (!rounds.some(round => String(round.id) === String(payload.roundId))) throw new Error('Round nebyl nalezen.');
+  if (!rounds.some(round => String(round.id) === String(payload.roundId))) throw new Error('Part nebyl nalezen.');
 
   const properties = PropertiesService.getScriptProperties();
   const key = ROUND_STATE_PREFIX + payload.formId;
@@ -239,6 +243,75 @@ function completedRoundIdsForTeam_(spreadsheet, teamId, rounds) {
   return completed;
 }
 
+function getOrCreatePartOpensSheet_(spreadsheet, rounds) {
+  let sheet = spreadsheet.getSheetByName(FORM_PART_OPENS_SHEET);
+  const created = !sheet;
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(FORM_PART_OPENS_SHEET);
+    sheet.getRange(1, 1, 1, FORM_PART_OPENS_HEADERS.length).setValues([FORM_PART_OPENS_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+
+  if (created) {
+    const seen = {};
+    const rows = [];
+    const firstRoundId = rounds && rounds[0] ? String(rounds[0].id) : '';
+    const teams = getOrCreateTeamsSheet_(spreadsheet);
+    if (firstRoundId && teams.getLastRow() > 1) {
+      teams.getRange(2, 1, teams.getLastRow() - 1, 3).getValues().forEach(row => {
+        const teamId = String(row[0] || '');
+        if (!teamId) return;
+        const key = teamId + '|' + firstRoundId;
+        if (seen[key]) return;
+        seen[key] = true;
+        rows.push([teamId, firstRoundId, row[2] || new Date()]);
+      });
+    }
+
+    const meta = ensureMetaHeaders_(spreadsheet);
+    if (meta.getLastRow() > 1) {
+      meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
+        const teamId = String(row[2] || '');
+        const roundId = String(row[8] || firstRoundId);
+        if (!teamId || !roundId) return;
+        const key = teamId + '|' + roundId;
+        if (seen[key]) return;
+        seen[key] = true;
+        rows.push([teamId, roundId, row[0] || new Date()]);
+      });
+    }
+    if (rows.length) sheet.getRange(2, 1, rows.length, FORM_PART_OPENS_HEADERS.length).setValues(rows);
+  }
+  return sheet;
+}
+
+function markPartOpened_(spreadsheet, teamId, roundId, rounds) {
+  const sheet = getOrCreatePartOpensSheet_(spreadsheet, rounds);
+  if (sheet.getLastRow() > 1) {
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    if (values.some(row => String(row[0]) === String(teamId) && String(row[1]) === String(roundId))) return;
+  }
+  sheet.appendRow([String(teamId), String(roundId), new Date()]);
+}
+
+function partDistributedCounts_(spreadsheet, rounds) {
+  const counts = {};
+  (rounds || []).forEach(round => counts[String(round.id)] = 0);
+  const sheet = getOrCreatePartOpensSheet_(spreadsheet, rounds);
+  if (sheet.getLastRow() < 2) return counts;
+  const seen = {};
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().forEach(row => {
+    const teamId = String(row[0] || '');
+    const roundId = String(row[1] || '');
+    if (!teamId || !roundId || !Object.prototype.hasOwnProperty.call(counts, roundId)) return;
+    const key = teamId + '|' + roundId;
+    if (seen[key]) return;
+    seen[key] = true;
+    counts[roundId] += 1;
+  });
+  return counts;
+}
+
 function getSessionView(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
@@ -263,11 +336,13 @@ function getSessionView(formId) {
 
   const teams = [];
   const answersByTeamRound = {};
+  let distributedByRound = {};
   if (spreadsheetId) {
     try {
       const target = SpreadsheetApp.openById(spreadsheetId);
       const teamSheet = getOrCreateTeamsSheet_(target);
       const completedByTeam = {};
+      distributedByRound = partDistributedCounts_(target, rounds);
 
       if (teamSheet.getLastRow() > 1) {
         teamSheet.getRange(2, 1, teamSheet.getLastRow() - 1, 4).getValues().forEach(row => {
@@ -321,7 +396,7 @@ function getSessionView(formId) {
       fields:round.fields || [],
       unlocked:!!(lockState && lockState.unlocked),
       submittedCount:teams.filter(team => (team.completedRoundIds || []).includes(round.id)).length,
-      distributedCount:teams.length
+      distributedCount:Number(distributedByRound[round.id]) || 0
     };
   });
 
@@ -347,24 +422,28 @@ function getHomeFormSummaries() {
     });
   }
 
-  const publishedByForm = {};
+  const schemaByForm = {};
   const formsSheet = getOrCreateFormsSheet_(central);
   if (formsSheet.getLastRow() > 1) {
     formsSheet.getRange(2, 1, formsSheet.getLastRow() - 1, FORMS_HEADERS.length).getValues().forEach(row => {
-      if (!row[0] || !row[7]) return;
-      try {
-        publishedByForm[String(row[0])] = {schema:JSON.parse(String(row[7])), publishedAt:toIso_(row[8])};
-      } catch (error) {}
+      if (!row[0]) return;
+      let draftSchema = null;
+      let publishedSchema = null;
+      try { draftSchema = row[3] ? JSON.parse(String(row[3])) : null; } catch (error) {}
+      try { publishedSchema = row[7] ? JSON.parse(String(row[7])) : null; } catch (error) {}
+      schemaByForm[String(row[0])] = {draftSchema:draftSchema,publishedSchema:publishedSchema};
     });
   }
 
   return forms.map(form => {
     const data = dataByForm[form.formId] || null;
-    const published = publishedByForm[form.formId] || null;
-    let distributed = 0;
-    let collected = 0;
-    const rounds = published && published.schema ? schemaRounds_(published.schema) : [];
+    const schemas = schemaByForm[form.formId] || {};
+    const effectiveSchema = schemas.publishedSchema || schemas.draftSchema || null;
+    const rounds = effectiveSchema ? schemaRounds_(effectiveSchema) : [];
     const completedByTeam = {};
+    let totalParticipants = 0;
+    let collected = 0;
+    let distributedByRound = {};
 
     if (data && data.spreadsheetId) {
       try {
@@ -372,11 +451,12 @@ function getHomeFormSummaries() {
         const teams = getOrCreateTeamsSheet_(target);
         if (teams.getLastRow() > 1) {
           const rows = teams.getRange(2, 1, teams.getLastRow() - 1, 4).getValues();
-          distributed = rows.filter(row => row[0]).length;
+          totalParticipants = rows.filter(row => row[0]).length;
           rows.forEach(row => { if (row[0]) completedByTeam[String(row[0])] = []; });
         }
 
         if (rounds.length) {
+          distributedByRound = partDistributedCounts_(target, rounds);
           const meta = ensureMetaHeaders_(target);
           if (meta.getLastRow() > 1) {
             meta.getRange(2, 1, meta.getLastRow() - 1, FORM_META_HEADERS.length).getValues().forEach(row => {
@@ -392,17 +472,18 @@ function getHomeFormSummaries() {
       } catch (error) {}
     }
 
-    const roundStates = published && published.schema ? getRoundStates_(form.formId, published.schema) : [];
+    const roundStates = schemas.publishedSchema ? getRoundStates_(form.formId, schemas.publishedSchema) : [];
     const roundSummary = rounds.map((round,index) => ({
       roundId:round.id,
       number:index + 1,
       unlocked:!!((roundStates.find(item => item.roundId === round.id) || {}).unlocked),
       submittedCount:Object.keys(completedByTeam).filter(teamId => (completedByTeam[teamId] || []).includes(round.id)).length,
-      distributedCount:distributed
+      distributedCount:Number(distributedByRound[round.id]) || 0
     }));
 
     return Object.assign({}, form, {
-      distributedCount:distributed,
+      distributedCount:totalParticipants,
+      totalParticipants:totalParticipants,
       collectedCount:collected,
       dataUrl:data ? data.spreadsheetUrl : '',
       rounds:roundSummary
@@ -516,7 +597,7 @@ function participantFields_(schema) {
       const copy = Object.assign({}, field);
       copy._roundId = round.id;
       copy._roundNumber = roundIndex + 1;
-      copy._columnLabel = (multi ? ('R' + (roundIndex + 1) + ' · ') : '') + String(field.label || ('Položka ' + (fieldIndex + 1)));
+      copy._columnLabel = (multi ? ('Part ' + String.fromCharCode(65 + roundIndex) + ' · ') : '') + String(field.label || ('Položka ' + (fieldIndex + 1)));
       fields.push(copy);
     });
   });
