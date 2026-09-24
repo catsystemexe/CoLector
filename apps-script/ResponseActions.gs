@@ -51,16 +51,19 @@ function submitParticipantResponse(payload) {
     const meta = ensureMetaHeaders_(target);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
-    if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
     const teamLabel = String(team.values[1] || '');
 
     if (hasResponseId_(meta, payload.responseId)) {
+      if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
       return {ok:true,duplicate:true,teamLabel:teamLabel};
     }
 
     const completed = completedRoundIdsForTeam_(target, payload.teamId, rounds);
     const nextRound = rounds.find(round => !completed.includes(round.id));
-    if (!nextRound) return {ok:true,duplicate:false,teamLabel:teamLabel,complete:true};
+    if (!nextRound) {
+      if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
+      return {ok:true,duplicate:false,teamLabel:teamLabel,complete:true};
+    }
     if (String(nextRound.id) !== String(payload.roundId)) throw new Error('Tento Part teď není aktivní.');
 
     const roundStates = getRoundStates_(payload.formId, published.schema);
@@ -86,6 +89,7 @@ function submitParticipantResponse(payload) {
     const complete = rounds.every(round => completedAfter.includes(round.id));
     if (complete) teams.getRange(team.rowIndex, 4).setValue(new Date());
     applyRuntimeDelta_(central, payload.formId, rounds, {
+      participantDelta:team.created ? 1 : 0,
       submittedRoundId:nextRound.id,
       collectedDelta:complete ? 1 : 0
     });
@@ -119,18 +123,19 @@ function getParticipantRoundView(payload) {
     ensureRuntimeSummaryForForm_(central, payload.formId, published.schema, target);
     const teams = getOrCreateTeamsSheet_(target);
     const team = ensureParticipantTeam_(teams, payload.teamId);
-    if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
     const teamLabel = String(team.values[1] || '');
     const completed = completedRoundIdsForTeam_(target, payload.teamId, rounds);
     const nextRound = rounds.find(round => !completed.includes(round.id));
 
     if (!nextRound) {
+      if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
       return {status:'complete',teamLabel:teamLabel,completedRoundIds:completed,roundCount:rounds.length,lockingEnabled:PART_LOCKING_ENABLED};
     }
 
     const states = getRoundStates_(payload.formId, published.schema);
     const state = states.find(item => item.roundId === nextRound.id);
     if (!state || !state.unlocked) {
+      if (team.created) applyRuntimeDelta_(central, payload.formId, rounds, {participantDelta:1});
       return {
         status:'locked',
         teamLabel:teamLabel,
@@ -143,7 +148,12 @@ function getParticipantRoundView(payload) {
     }
 
     const opened = markPartOpened_(target, payload.teamId, nextRound.id, rounds);
-    if (opened) applyRuntimeDelta_(central, payload.formId, rounds, {distributedRoundId:nextRound.id});
+    if (team.created || opened) {
+      applyRuntimeDelta_(central, payload.formId, rounds, {
+        participantDelta:team.created ? 1 : 0,
+        distributedRoundId:opened ? nextRound.id : ''
+      });
+    }
 
     return {
       status:'ready',
