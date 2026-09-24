@@ -18,23 +18,33 @@
 .swipe-action svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.9}
 .swipe-action.duplicate{background:#657086}
 .swipe-action.delete{background:#c54c56}
-.form-card{position:relative;z-index:1;min-width:0;min-height:70px;display:grid;grid-template-columns:minmax(0,1fr);align-items:center;background:#fff;border:1px solid #edf0f5;border-radius:14px;overflow:hidden;transform:translateX(0);transition:transform .2s ease;will-change:transform;cursor:pointer}
+.form-card{position:relative;z-index:1;min-width:0;min-height:70px;background:#fff;border:1px solid #edf0f5;border-radius:14px;overflow:hidden;transform:translateX(0);transition:transform .2s ease;will-change:transform;cursor:pointer}
 .form-card.dragging{transition:none}
 .form-row.collecting .form-card{background:#eef6ff}
 .form-row.complete .form-card{background:#edf9f1}
-.form-main{position:relative;min-width:0;width:100%;min-height:70px;border:0;background:transparent;text-align:left;padding:11px 48px 11px 14px;color:#27334a;cursor:pointer}
+.form-main{position:relative;min-width:0;width:100%;min-height:70px;border:0;background:transparent;text-align:left;padding:11px var(--part-space,48px) 11px 14px;color:#27334a;cursor:pointer;display:flex;flex-direction:column;justify-content:center}
 .form-title{position:relative;z-index:1;font-weight:740;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.form-meta{position:relative;z-index:1;margin-top:5px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}
-.form-edit-watermark{position:absolute;right:12px;top:50%;transform:translateY(-50%) rotate(-7deg);width:43px;height:43px;color:#aeb8c8;opacity:.20;pointer-events:none}
+.form-meta{position:relative;z-index:1;margin-top:5px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px;white-space:nowrap}
+.total-participants{font-weight:780;color:#657086}
+.form-edit-watermark{position:absolute;right:calc(var(--part-space,48px) + 8px);top:50%;transform:translateY(-50%) rotate(-7deg);width:43px;height:43px;color:#aeb8c8;opacity:.20;pointer-events:none}
 .form-edit-watermark svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.55}
-.progress{padding:2px 7px;border-radius:999px;background:rgba(7,158,174,.10);color:#087f8d;font-weight:800}
-.complete .progress{background:rgba(47,151,91,.12);color:#2c8653}
-.round-strip{display:flex;align-items:center;gap:5px;padding:6px 9px 8px 13px;border-top:1px solid rgba(133,145,165,.12);cursor:default}
-.round-strip-label{margin-right:2px;color:#8a94a6;font-size:10px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
-.home-round-lock{height:29px;min-width:39px;padding:0 7px;border:1px solid #dfe5ee;border-radius:9px;background:#f7f8fb;color:#7b8699;display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:900}
-.home-round-lock svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.home-round-lock.open{background:#edf9f1;border-color:#c9e8d5;color:#27845d}
-.home-round-lock:disabled{opacity:.5;cursor:default}
+.part-controls{position:absolute;z-index:4;right:7px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px}
+.part-chip{position:relative;width:48px;height:56px;border:1px solid #dfe5ee;border-radius:12px;background:#f7f8fb;color:#657086;padding:3px 3px 4px;display:grid;grid-template-rows:1fr auto;align-items:center;justify-items:center;overflow:hidden}
+.part-chip.open{background:#edf9f1;border-color:#c9e8d5;color:#27845d}
+.part-chip:disabled{cursor:default;opacity:.72}
+.part-letter{font-size:22px;line-height:1;font-weight:900}
+.part-stats{display:flex;align-items:baseline;gap:1px;font-size:9.5px;font-weight:850;line-height:1;letter-spacing:-.02em}
+.part-stats .selected{color:#23975b}
+.part-stats .sep{color:#9aa4b5}
+.part-stats .distributed{color:#2671d9}
+.part-lock-overlay{position:absolute;inset:0;display:grid;place-items:center;background:inherit;color:inherit;opacity:0;transform:scale(.86);transition:opacity .12s ease,transform .12s ease;pointer-events:none}
+.part-lock-overlay svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.part-chip.show-lock .part-lock-overlay{opacity:1;transform:scale(1)}
+@media(max-width:520px){
+  .part-chip{width:44px;height:54px}
+  .part-letter{font-size:20px}
+  .part-stats{font-size:9px}
+}
 .empty{padding:24px 18px;background:#fff;border:1px solid var(--line);border-radius:16px;color:var(--muted);text-align:center}.home-bottom-dock{position:fixed;z-index:45;left:0;right:0;bottom:0;padding:30px 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(244,246,251,0),rgba(244,246,251,.95) 28%,#f4f6fb 52%)}.home-bottom-inner{width:min(100%,620px);margin:0 auto}.new-form{width:100%;min-height:84px;border:0;border-radius:28px;background:linear-gradient(135deg,#12B8B5,#069EAE 55%,#087CA8);color:#fff;font-size:21px;font-weight:820;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 24px rgba(7,158,174,.22)}.new-form .plus{font-size:34px;font-weight:400;line-height:1}.loading-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.96);opacity:1;transition:opacity 180ms ease}.loading-overlay.hidden{opacity:0;pointer-events:none}.loading-box{display:flex;flex-direction:column;align-items:center;gap:14px}.colector-loader,.colector-loader-svg{width:120px;height:120px}.loader-layer{transform-box:fill-box;transform-origin:center;opacity:0}.loader-layer-top{animation:top 2.2s ease-in-out infinite}.loader-layer-middle{animation:middle 2.2s ease-in-out infinite}.loader-layer-bottom{animation:bottom 2.2s ease-in-out infinite}.loading-text{font-size:16px;font-weight:650;color:#27334a}@keyframes top{0%{transform:translateY(-16px);opacity:0}22%{transform:translateY(0);opacity:1}48%{opacity:1}84%,100%{transform:translateY(30px);opacity:0}}@keyframes middle{0%,14%{transform:translateY(-14px);opacity:0}36%{transform:translateY(0);opacity:1}48%{opacity:1}88%,100%{transform:translateY(30px);opacity:0}}@keyframes bottom{0%,28%{transform:translateY(-12px);opacity:0}48%{transform:translateY(0);opacity:1}56%{opacity:1}92%,100%{transform:translateY(30px);opacity:0}}@media(prefers-reduced-motion:reduce){.loader-layer{animation:none!important;opacity:1;transform:none}}.qr-screen{position:fixed;z-index:100;inset:0;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px}.qr-screen.open{display:flex}.qr-close{position:absolute;top:14px;right:14px;width:44px;height:44px;border:0;border-radius:12px;background:#f1f3f8;color:#556178;font-size:26px}.qr-title{margin:0 0 20px;text-align:center;font-size:26px;color:#27334a}.qr-box{padding:14px;background:#fff;border-radius:18px;box-shadow:0 10px 34px rgba(25,35,58,.12)}@media(max-width:520px){:root{--header:72px;--section:84px}.brand-mark{width:40px;height:40px}.section-name{font-size:12px}.nav-btn{width:50px;height:50px;border-radius:15px}.nav-btn svg{width:25px;height:25px}.header-nav{gap:7px}.section-title{font-size:20px}}
   </style>
 </head>
@@ -52,6 +62,7 @@
     const fmt=v=>{if(!v)return'';const d=new Date(v);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}).format(d)};
     const lockSvg=open=>open?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
     const pencilSvg='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/></svg>';
+    const partLetter=number=>String.fromCharCode(64+Math.max(1,Number(number)||1));
     let openSwipe=null;
 
     function hideLoader(){const x=document.getElementById('loadingOverlay');x.classList.add('hidden');setTimeout(()=>x.style.display='none',180)}
@@ -74,12 +85,12 @@
       shell.dataset.open='1';openSwipe=shell;
     }
     function installSwipe(shell,card){
-      let pointerId=null,startX=0,startY=0,startOffset=0,dragging=false,moved=false;
+      let pointerId=null,startX=0,startY=0,startOffset=0,dragging=false;
       const max=136;
       card.addEventListener('pointerdown',e=>{
         if(e.button!=null&&e.button!==0)return;
-        if(e.target.closest('.home-round-lock'))return;
-        pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startOffset=shell.dataset.open==='1'?-max:0;dragging=false;moved=false;
+        if(e.target.closest('.part-chip'))return;
+        pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startOffset=shell.dataset.open==='1'?-max:0;dragging=false;
         card.setPointerCapture&&card.setPointerCapture(pointerId);
       });
       card.addEventListener('pointermove',e=>{
@@ -91,7 +102,7 @@
           dragging=true;card.classList.add('dragging');
           if(openSwipe&&openSwipe!==shell)closeSwipe(openSwipe);
         }
-        moved=true;e.preventDefault();
+        e.preventDefault();
         const x=Math.max(-max,Math.min(0,startOffset+dx));
         card.style.transform='translateX('+x+'px)';
       });
@@ -110,24 +121,31 @@
       card.addEventListener('pointercancel',()=>{if(pointerId!=null){card.classList.remove('dragging');closeSwipe(shell);pointerId=null;dragging=false}});
     }
 
-    function roundStrip(form){
+    function buildPartControls(form){
       const rounds=Array.isArray(form.rounds)?form.rounds:[];
-      if(!form.publishedAt||!rounds.length)return null;
-      const strip=document.createElement('div');strip.className='round-strip';
-      strip.onclick=e=>e.stopPropagation();
-      const label=document.createElement('span');label.className='round-strip-label';label.textContent='Rounds';strip.append(label);
-      rounds.forEach(round=>{
-        const button=document.createElement('button');button.type='button';button.className='home-round-lock'+(round.unlocked?' open':'');
-        button.title=(round.unlocked?'Zamknout':'Odemknout')+' Round '+round.number;
-        button.setAttribute('aria-label',button.title);
-        button.innerHTML=lockSvg(round.unlocked)+'<span>'+round.number+'</span>';
-        button.onclick=e=>{
-          e.stopPropagation();button.disabled=true;
-          google.script.run.withSuccessHandler(load).withFailureHandler(error=>{button.disabled=false;alert((error&&error.message)||'Stav Roundu se nepodařilo změnit.')}).setRoundLock({formId:form.formId,roundId:round.roundId,unlocked:!round.unlocked});
-        };
-        strip.append(button);
+      if(!rounds.length)return null;
+      const root=document.createElement('div');root.className='part-controls';root.onclick=e=>e.stopPropagation();
+      rounds.forEach(part=>{
+        const letter=partLetter(part.number);
+        const button=document.createElement('button');button.type='button';button.className='part-chip'+(part.unlocked?' open':'');
+        const selected=Number(part.submittedCount)||0,distributed=Number(part.distributedCount)||0;
+        button.title=(form.publishedAt?(part.unlocked?'Zamknout':'Odemknout'):'Part')+' Part '+letter;
+        button.setAttribute('aria-label',button.title+'; '+selected+' vybráno z '+distributed+' rozdaných');
+        button.innerHTML='<span class="part-letter">'+letter+'</span><span class="part-stats"><span class="selected">'+selected+'</span><span class="sep">/</span><span class="distributed">'+distributed+'</span></span><span class="part-lock-overlay">'+lockSvg(part.unlocked)+'</span>';
+        if(!form.publishedAt){button.disabled=true}
+        else{
+          button.onclick=e=>{
+            e.stopPropagation();
+            const target=!part.unlocked;
+            const overlay=button.querySelector('.part-lock-overlay');
+            if(overlay)overlay.innerHTML=lockSvg(target);
+            button.classList.add('show-lock');button.disabled=true;
+            google.script.run.withSuccessHandler(()=>{setTimeout(load,420)}).withFailureHandler(error=>{button.disabled=false;button.classList.remove('show-lock');alert((error&&error.message)||'Stav Partu se nepodařilo změnit.')}).setRoundLock({formId:form.formId,roundId:part.roundId,unlocked:target});
+          };
+        }
+        root.append(button);
       });
-      return strip;
+      return root;
     }
 
     function hiddenAction(title,html,cls,fn){
@@ -140,9 +158,12 @@
       const items=forms||[];formsCountEl.textContent=String(items.length);
       if(!items.length){recentFormsEl.innerHTML='<div class="empty">Zatím nemáš žádný formulář.</div>';return}
       items.forEach(form=>{
-        const distributed=Number(form.distributedCount)||0,collected=Number(form.collectedCount)||0;
-        const isDistributed=distributed>0;
-        const row=document.createElement('div');row.className='form-row';if(isDistributed)row.classList.add(collected>=distributed?'complete':'collecting');
+        const total=Number(form.totalParticipants!=null?form.totalParticipants:form.distributedCount)||0;
+        const collected=Number(form.collectedCount)||0;
+        const isDistributed=total>0;
+        const rounds=Array.isArray(form.rounds)?form.rounds:[];
+        const partSpace=rounds.length?Math.min(230,rounds.length*52+12):48;
+        const row=document.createElement('div');row.className='form-row';if(isDistributed)row.classList.add(collected>=total?'complete':'collecting');
 
         const qr=document.createElement('button');qr.className='form-qr';qr.innerHTML='<svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M15 14h2v2h-2zM19 14h2v4h-2zM14 19h4v2h-4zM20 20h1v1h-1z"/></svg>';
         if(form.publishedAt)qr.onclick=e=>{e.stopPropagation();showQr(form)};else qr.disabled=true;
@@ -153,23 +174,27 @@
         const del=hiddenAction('Smazat','<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>','delete',()=>{if(confirm('Smazat tento formulář?'))google.script.run.withSuccessHandler(load).deleteFormDraft(form.formId)});
         actions.append(dup,del);
 
-        const card=document.createElement('div');card.className='form-card';card.setAttribute('role','button');card.tabIndex=0;
+        const card=document.createElement('div');card.className='form-card';card.setAttribute('role','button');card.tabIndex=0;card.style.setProperty('--part-space',partSpace+'px');
         card.setAttribute('aria-label',isDistributed?'Otevřít Session':'Upravit formulář');
+
         const main=document.createElement('div');main.className='form-main';
         main.innerHTML='<div class="form-title"></div><div class="form-meta"><span>'+fmt(form.updatedAt||form.createdAt)+'</span></div>';
         main.querySelector('.form-title').textContent=form.internalTitle||form.title||'Bez názvu';
-        if(isDistributed){const p=document.createElement('span');p.className='progress';p.textContent=collected+'/'+distributed;main.querySelector('.form-meta').append(p)}
-        else{const watermark=document.createElement('span');watermark.className='form-edit-watermark';watermark.innerHTML=pencilSvg;main.append(watermark)}
+        if(total>0){
+          const totalEl=document.createElement('span');totalEl.className='total-participants';totalEl.textContent='Celkem '+total;main.querySelector('.form-meta').append(totalEl);
+        }
+        if(!isDistributed){const watermark=document.createElement('span');watermark.className='form-edit-watermark';watermark.innerHTML=pencilSvg;main.append(watermark)}
         card.append(main);
-        const strip=roundStrip(form);if(strip)card.append(strip);
+
+        const parts=buildPartControls(form);if(parts)card.append(parts);
 
         const activate=()=>{
           if(card.dataset.suppressClick==='1')return;
           if(shell.dataset.open==='1'){closeSwipe(shell);return}
           go((isDistributed?'?view=session&form=':'?view=editor&form=')+encodeURIComponent(form.formId));
         };
-        card.onclick=e=>{if(e.target.closest('.home-round-lock'))return;activate()};
-        card.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.home-round-lock')){e.preventDefault();activate()}};
+        card.onclick=e=>{if(e.target.closest('.part-chip'))return;activate()};
+        card.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.part-chip')){e.preventDefault();activate()}};
 
         installSwipe(shell,card);
         shell.append(actions,card);row.append(qr,shell);recentFormsEl.append(row);
