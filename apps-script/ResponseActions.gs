@@ -431,6 +431,9 @@ function normalizeRuntimeRounds_(runtime, rounds) {
     if (!runtime.roundStats[round.id]) {
       runtime.roundStats[round.id] = {distributedCount:0, submittedCount:0};
     }
+    const stats = runtime.roundStats[round.id];
+    stats.submittedCount = Math.max(0, Number(stats.submittedCount) || 0);
+    stats.distributedCount = Math.max(stats.submittedCount, Number(stats.distributedCount) || 0);
   });
   return runtime;
 }
@@ -540,6 +543,7 @@ function getSessionView(formId) {
 
   const roundViews = rounds.map((round,index) => {
     const lockState = roundStates.find(item => item.roundId === round.id);
+    const submittedCount = teams.filter(team => (team.completedRoundIds || []).includes(round.id)).length;
     return {
       roundId:round.id,
       number:index + 1,
@@ -547,8 +551,8 @@ function getSessionView(formId) {
       instructions:round.instructions || '',
       fields:round.fields || [],
       unlocked:!!(lockState && lockState.unlocked),
-      submittedCount:teams.filter(team => (team.completedRoundIds || []).includes(round.id)).length,
-      distributedCount:Number(distributedByRound[round.id]) || 0
+      submittedCount:submittedCount,
+      distributedCount:Math.max(submittedCount, Number(distributedByRound[round.id]) || 0)
     };
   });
 
