@@ -6,6 +6,7 @@ const FORM_META_HEADERS = ['timestamp', 'form_id', 'team_id', 'team_label', 'res
 const ROUND_STATE_PREFIX = 'colector.rounds.';
 const FORM_PART_OPENS_SHEET = '_PART_OPENS';
 const FORM_PART_OPENS_HEADERS = ['team_id', 'round_id', 'opened_at'];
+const PART_LOCKING_ENABLED = false;
 
 function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
@@ -150,6 +151,7 @@ function getParticipantRoundView(payload) {
 
 function getRoundLockState(payload) {
   if (!payload || !payload.formId || !payload.roundId) throw new Error('Neplatný dotaz na Part.');
+  if (!PART_LOCKING_ENABLED) return {ok:true,roundId:String(payload.roundId),unlocked:true,lockingEnabled:false};
   const properties = PropertiesService.getScriptProperties();
   const key = ROUND_STATE_PREFIX + payload.formId;
   let values = {};
@@ -205,7 +207,10 @@ function getRoundStates_(formId, schema) {
   return rounds.map((round,index) => ({
     roundId:round.id,
     number:index + 1,
-    unlocked:typeof stored[round.id] === 'boolean' ? stored[round.id] : index === 0
+    unlocked:PART_LOCKING_ENABLED
+      ? (typeof stored[round.id] === 'boolean' ? stored[round.id] : index === 0)
+      : true,
+    lockingEnabled:PART_LOCKING_ENABLED
   }));
 }
 
