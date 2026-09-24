@@ -112,6 +112,32 @@ function formRepositoryList_(central) {
   }).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
 }
 
+function formRepositoryListWithSchemas_(central) {
+  const sheet = getFormsStore_(central);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, FORMS_HEADERS.length).getValues();
+  return values.map(row => {
+    let draftSchema = null;
+    let publishedSchema = null;
+    try { draftSchema = row[3] ? JSON.parse(String(row[3])) : null; } catch (error) {}
+    try { publishedSchema = row[7] ? JSON.parse(String(row[7])) : null; } catch (error) {}
+
+    return {
+      formId:row[0],
+      internalTitle:row[1] || (draftSchema && draftSchema.internalTitle) || '',
+      title:row[2] || (draftSchema && draftSchema.title) || '',
+      status:row[4] || 'draft',
+      createdAt:toIso_(row[5]),
+      updatedAt:toIso_(row[6]),
+      publishedAt:toIso_(row[8]),
+      draftSchema:draftSchema,
+      publishedSchema:publishedSchema
+    };
+  }).filter(item => item.formId)
+    .sort((a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+}
+
 function formRepositorySaveDraft_(payload, central) {
   const schema = payload.schema;
   schema.formId = payload.formId;
