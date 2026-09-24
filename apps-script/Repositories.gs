@@ -379,3 +379,76 @@ function ensurePartOpensStore_(spreadsheet, rounds) {
   if (rows.length) sheet.getRange(2, 1, rows.length, FORM_PART_OPENS_HEADERS.length).setValues(rows);
   return sheet;
 }
+
+
+// ---------- MATERIALIZED FORM RUNTIME read model ----------
+
+function getFormRuntimeStore_(central) {
+  return (central || openCentralStore_()).getSheetByName(FORM_RUNTIME_SHEET);
+}
+
+function ensureFormRuntimeStore_(central) {
+  const spreadsheet = central || openCentralStore_();
+  let sheet = spreadsheet.getSheetByName(FORM_RUNTIME_SHEET);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(FORM_RUNTIME_SHEET);
+    sheet.getRange(1, 1, 1, FORM_RUNTIME_HEADERS.length).setValues([FORM_RUNTIME_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function formRuntimeRepositoryGet_(formId, central) {
+  const sheet = getFormRuntimeStore_(central);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, FORM_RUNTIME_HEADERS.length).getValues();
+  const index = rows.findIndex(row => String(row[0]) === String(formId));
+  if (index === -1) return null;
+  return formRuntimeRowToRecord_(rows[index], index + 2);
+}
+
+function formRuntimeRepositoryMap_(central) {
+  const sheet = getFormRuntimeStore_(central);
+  const result = {};
+  if (!sheet || sheet.getLastRow() < 2) return result;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, FORM_RUNTIME_HEADERS.length).getValues();
+  rows.forEach((row,index) => {
+    const record = formRuntimeRowToRecord_(row, index + 2);
+    if (record.formId) result[record.formId] = record;
+  });
+  return result;
+}
+
+function formRuntimeRowToRecord_(row, rowIndex) {
+  let roundStats = {};
+  try { roundStats = row[3] ? JSON.parse(String(row[3])) : {}; } catch (error) { roundStats = {}; }
+  return {
+    rowIndex: rowIndex || 0,
+    formId: String(row[0] || ''),
+    totalParticipants: Number(row[1]) || 0,
+    collectedCount: Number(row[2]) || 0,
+    roundStats: roundStats && typeof roundStats === 'object' ? roundStats : {},
+    revision: String(row[4] || ''),
+    updatedAt: row[5] ? new Date(row[5]).toISOString() : ''
+  };
+}
+
+function formRuntimeRepositorySave_(record, central) {
+  const sheet = ensureFormRuntimeStore_(central);
+  const now = new Date();
+  const existing = formRuntimeRepositoryGet_(record.formId, central);
+  const row = [
+    String(record.formId || ''),
+    Number(record.totalParticipants) || 0,
+    Number(record.collectedCount) || 0,
+    JSON.stringify(record.roundStats || {}),
+    String(record.revision || ''),
+    now
+  ];
+
+  if (existing && existing.rowIndex) sheet.getRange(existing.rowIndex, 1, 1, row.length).setValues([row]);
+  else sheet.appendRow(row);
+
+  record.updatedAt = now.toISOString();
+  return record;
+}
