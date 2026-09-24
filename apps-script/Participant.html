@@ -102,7 +102,8 @@
 
     function renderLocked(result){
       currentStatus='locked';currentSchema=null;currentRoundId=result.roundId||'';currentRoundNumber=Number(result.roundNumber)||currentRoundNumber||0;
-      sheet.innerHTML='<div class="state"><div class="waiting-pulse" aria-hidden="true"></div><strong>Čekáme na otevření</strong>Formulář se zobrazí automaticky, jakmile operátor odemkne tento Round.</div>';
+      const partLabel='Part '+String.fromCharCode(64+Math.max(1,currentRoundNumber||1));
+      sheet.innerHTML='<div class="state"><div class="waiting-pulse" aria-hidden="true"></div><strong>Čekáme na otevření '+partLabel+'</strong>Formulář se zobrazí automaticky, jakmile operátor tuto část odemkne.</div>';
     }
 
     function renderComplete(){
