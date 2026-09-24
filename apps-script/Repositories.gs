@@ -267,6 +267,20 @@ function findFormDataRecord_(registry, formId) {
   };
 }
 
+function getFormDataRecord_(formId, central) {
+  return findFormDataRecord_(getFormDataRegistryStore_(central), formId);
+}
+
+function openFormDataStore_(formId, central) {
+  const record = getFormDataRecord_(formId, central);
+  if (!record || !record.spreadsheetId) return null;
+  try {
+    return SpreadsheetApp.openById(record.spreadsheetId);
+  } catch (error) {
+    return null;
+  }
+}
+
 function getTeamsStore_(spreadsheet) {
   return spreadsheet ? spreadsheet.getSheetByName(FORM_TEAMS_SHEET) : null;
 }
