@@ -1,12 +1,16 @@
 function deleteFormDraft(formId) {
   if (!formId) throw new Error('Chybí form_id.');
 
-  const sheet = getFormsStore_(openCentralStore_());
+  const central = openCentralStore_();
+  const sheet = getFormsStore_(central);
   if (!sheet) return { ok: true, deleted: false };
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
+    if (formRepositoryIsDistributed_(formId, central)) {
+      throw new Error('Rozdaný formulář nelze smazat. Nejprve dokončete práci se Session.');
+    }
     const rowIndex = findFormRow_(sheet, formId);
     if (!rowIndex) return { ok: true, deleted: false };
     sheet.deleteRow(rowIndex);
