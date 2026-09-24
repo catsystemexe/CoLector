@@ -236,7 +236,9 @@ function publishFormDraft(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    return formRepositoryPublish_(payload, openCentralStore_());
+    const result = formRepositoryPublish_(payload, openCentralStore_());
+    if (typeof bumpSessionRevision_ === 'function') bumpSessionRevision_(payload.formId);
+    return result;
   } finally {
     lock.releaseLock();
   }
