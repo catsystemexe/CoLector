@@ -31,3 +31,4 @@ apps-script/.clasp.json
 
 # Local OAuth/client credentials
 credentials.json
+.clasp-cli/
