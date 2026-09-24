@@ -15,7 +15,6 @@ function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
   const central = openCentralStore_();
   const published = formRepositoryGetPublished_(payload.formId, central);
-  perfMark_(perf, 'published-form');
   if (!published || !published.schema) throw new Error('Formulář není publikovaný.');
 
   const lock = LockService.getScriptLock();
@@ -533,7 +532,10 @@ function getSessionView(formId) {
         team.completedRoundIds = completedByTeam[team.teamId] || [];
         team.submitted = rounds.length > 0 && rounds.every(round => team.completedRoundIds.includes(round.id));
       });
-    } catch (error) {}
+    } catch (error) {
+      perfEnd_(perf, {formId:formId,status:'data-read-error',message:String(error && error.message || error)});
+      throw error;
+    }
   }
 
   const roundViews = rounds.map((round,index) => {
