@@ -146,6 +146,11 @@ function getEditorRouteBootstrap_() {
   if(qrButton){
     qrButton.disabled=false;
     qrButton.addEventListener('click',function(){
+      const cached=readFormCacheRecord(state.formId);
+      if(cached&&cached.synced===false){
+        alert('Formulář ještě není synchronizovaný s cloudem.');
+        return;
+      }
       google.script.run.withSuccessHandler(function(result){
         if(!result||!result.publishedAt){alert('Formulář nejdřív publikuj.');return}
         showQr();
@@ -158,16 +163,25 @@ function getEditorRouteBootstrap_() {
     publishButton.addEventListener('click',function(){
       publishButton.disabled=true;
       const original=publishButton.innerHTML;
-      publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Publikuji…</span>';
-      google.script.run.withSuccessHandler(function(result){
-        const currentSchema=buildSchema();
-        publishedSnapshot=JSON.parse(JSON.stringify(currentSchema));
-        writeFormCache(currentSchema,Date.parse((result&&result.publishedAt)||'')||Date.now());
-        refreshPublishState();
-        publishButton.classList.add('publish-ok');
-        publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg></span><span>Publikováno</span>';
-        setTimeout(function(){publishButton.classList.remove('publish-ok');publishButton.innerHTML=original;publishButton.disabled=false},1400);
-      }).withFailureHandler(function(error){publishButton.innerHTML=original;publishButton.disabled=false;alert((error&&error.message)||'Publikování se nepodařilo.')}).publishFormDraft({formId:state.formId,schema:buildSchema()});
+      publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Synchronizuji…</span>';
+      syncDraftNow(function(synced,error){
+        if(!synced){
+          publishButton.innerHTML=original;
+          publishButton.disabled=false;
+          alert((error&&error.message)||'Formulář se nepodařilo synchronizovat s cloudem.');
+          return;
+        }
+        publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Publikuji…</span>';
+        google.script.run.withSuccessHandler(function(result){
+          const currentSchema=buildSchema();
+          publishedSnapshot=JSON.parse(JSON.stringify(currentSchema));
+          writeFormCache(currentSchema,Date.parse((result&&result.publishedAt)||'')||Date.now(),true);
+          refreshPublishState();
+          publishButton.classList.add('publish-ok');
+          publishButton.innerHTML='<span class="bottom-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg></span><span>Publikováno</span>';
+          setTimeout(function(){publishButton.classList.remove('publish-ok');publishButton.innerHTML=original;publishButton.disabled=false},1400);
+        }).withFailureHandler(function(error){publishButton.innerHTML=original;publishButton.disabled=false;alert((error&&error.message)||'Publikování se nepodařilo.')}).publishFormDraft({formId:state.formId,schema:buildSchema()});
+      });
     });
   }
 
@@ -228,12 +242,13 @@ function getEditorRouteBootstrap_() {
         publishedSnapshot=result.publishedSchema||null;
         const serverUpdatedAt=Date.parse(result.updatedAt||'')||0;
         const latestLocal=readFormCacheRecord(params.form);
-        if(latestLocal&&Number(latestLocal.savedAt||0)>serverUpdatedAt){
+        const localDirty=!!(latestLocal&&(latestLocal.synced===false||(typeof latestLocal.synced==='undefined'&&Number(latestLocal.savedAt||0)>serverUpdatedAt)));
+        if(localDirty){
           refreshPublishState();
           scheduleSave();
           return;
         }
-        writeFormCache(result.schema,serverUpdatedAt||Date.now());
+        writeFormCache(result.schema,serverUpdatedAt||Date.now(),true);
         try{localStorage.setItem(STORAGE_KEY,JSON.stringify(result.schema))}catch(e){}
         applyEditorSchema(result.schema,{save:false});
         refreshPublishState();
