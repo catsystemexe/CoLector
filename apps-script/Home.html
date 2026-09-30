@@ -98,6 +98,78 @@
       }catch(error){}
       return records;
     }
+    function writeLocalFormRecord(formId,record){
+      if(!formId||!record)return;
+      try{localStorage.setItem(FORM_CACHE_PREFIX+formId,JSON.stringify(record))}catch(error){}
+    }
+    function syncPendingLocalForms(cloudForms){
+      if(!(window.google&&google.script&&google.script.run))return;
+      const records=readLocalFormRecords();
+      const cloudIds=new Set((Array.isArray(cloudForms)?cloudForms:[]).map(form=>String(form.formId||'')));
+      Object.keys(records).forEach(formId=>{
+        const record=records[formId];
+        if(!record||!record.schema||record.synced!==false)return;
+
+        // Existing forms may sync only while the cloud copy still exists.
+        // A never-synced new draft has cloudUpdatedAt=0 and may create its first cloud copy here.
+        const hadCloudCopy=Number(record.cloudUpdatedAt)||0;
+        if(hadCloudCopy>0&&!cloudIds.has(String(formId)))return;
+        if(record.syncing===true)return;
+
+        record.syncing=true;
+        writeLocalFormRecord(formId,record);
+
+        google.script.run
+          .withSuccessHandler(result=>{
+            const latest=readLocalFormRecords()[formId];
+            if(!latest||!latest.schema)return;
+
+            // Do not mark a newer edit as synced with an older server response.
+            if(Number(latest.savedAt||0)!==Number(record.savedAt||0)){
+              latest.syncing=false;
+              writeLocalFormRecord(formId,latest);
+              return;
+            }
+
+            const cloudAt=Date.parse((result&&result.updatedAt)||'')||Date.now();
+            latest.synced=true;
+            latest.syncing=false;
+            latest.cloudUpdatedAt=cloudAt;
+            writeLocalFormRecord(formId,latest);
+
+            const currentCloud=Array.isArray(cloudForms)?cloudForms:[];
+            const existing=currentCloud.find(form=>String(form.formId||'')===String(formId));
+            if(existing)existing.updatedAt=new Date(cloudAt).toISOString();
+            else currentCloud.unshift({
+              formId:formId,
+              internalTitle:latest.schema.internalTitle||'Nový formulář',
+              title:latest.schema.title||'',
+              status:'draft',
+              createdAt:'',
+              updatedAt:new Date(cloudAt).toISOString(),
+              publishedAt:'',
+              distributedCount:0,
+              totalParticipants:0,
+              collectedCount:0,
+              dataUrl:'',
+              rounds:localRounds(latest.schema)
+            });
+
+            const merged=mergeHomeWithLocal(currentCloud);
+            writeHomeCache(merged);
+            render(merged);
+          })
+          .withFailureHandler(()=>{
+            const latest=readLocalFormRecords()[formId];
+            if(latest){
+              latest.syncing=false;
+              writeLocalFormRecord(formId,latest);
+            }
+          })
+          .saveFormDraft({formId:formId,schema:record.schema});
+      });
+    }
+
     function localRounds(schema){
       const source=Array.isArray(schema&&schema.rounds)&&schema.rounds.length
         ? schema.rounds
@@ -339,10 +411,12 @@
     function load(){
       google.script.run
         .withSuccessHandler(forms=>{
-          const merged=mergeHomeWithLocal(forms);
+          const cloudForms=Array.isArray(forms)?forms:[];
+          const merged=mergeHomeWithLocal(cloudForms);
           writeHomeCache(merged);
           render(merged);
           hideLoader();
+          syncPendingLocalForms(cloudForms);
         })
         .withFailureHandler(error=>{
           const message=error&&error.message?error.message:String(error||'Neznámá chyba');
