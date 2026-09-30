@@ -248,7 +248,12 @@
         .withFailureHandler(error=>{
           const message=error&&error.message?error.message:String(error||'Neznámá chyba');
           console.error('getHomeFormSummaries failed:',error);
-          if(!recentFormsEl.children.length)recentFormsEl.innerHTML='<div class="empty">Formuláře se nepodařilo načíst.<br><small>'+escapeHtml(message)+'</small></div>';
+          if(!recentFormsEl.children.length){
+            const box=document.createElement('div');
+            box.className='empty';
+            box.textContent='Formuláře se nepodařilo načíst. '+message;
+            recentFormsEl.replaceChildren(box);
+          }
           hideLoader();
         })
         .getHomeFormSummaries()
