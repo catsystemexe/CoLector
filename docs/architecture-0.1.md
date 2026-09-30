@@ -285,6 +285,19 @@ Session nepřenáší celý dataset v pravidelném intervalu. Klient polluje pou
 
 Pokud je Part locking vypnutý, participant klient neprovádí polling lock state.
 
+### Local-first formuláře — fáze 1
+
+Editor ukládá aktuální draft nejdřív lokálně v prohlížeči a teprve potom jej synchronizuje do Google úložiště.
+
+- lokální kopie slouží jako rychlý pracovní mirror a ochrana proti krátkodobému výpadku cloudového zápisu,
+- Google zůstává kanonickým source of truth,
+- Home slučuje cloudový seznam s lokálními nesynchronizovanými drafty,
+- šedý obrys cloudu znamená, že aktuální lokální verze ještě není potvrzená v cloudu,
+- modrý plný cloud znamená, že aktuální verze je synchronizovaná,
+- publikace a zobrazení distribučního QR vyžadují úspěšnou cloudovou synchronizaci.
+
+Fáze 1 využívá existující per-form browser storage pro malé definice formulářů. Není to ještě plná offline PWA: první načtení aplikace stále závisí na Apps Script web app a odpovědi/session data zůstávají cloudové.
+
 ### Migrační záměr
 
 Při budoucím přesunu mimo Apps Script se má měnit zejména repository/storage implementace:
