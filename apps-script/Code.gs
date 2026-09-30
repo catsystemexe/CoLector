@@ -153,6 +153,10 @@ function getEditorRouteBootstrap_() {
       }
       google.script.run.withSuccessHandler(function(result){
         if(!result||!result.publishedAt){alert('Formulář nejdřív publikuj.');return}
+        const latest=readFormCacheRecord(state.formId);
+        const serverUpdatedAt=Date.parse(result.updatedAt||'')||0;
+        const unsynced=!!(latest&&(latest.synced===false||(typeof latest.synced==='undefined'&&Number(latest.savedAt||0)>serverUpdatedAt)));
+        if(unsynced){alert('Formulář ještě není synchronizovaný s cloudem.');return}
         showQr();
       }).withFailureHandler(function(error){alert((error&&error.message)||'QR se nepodařilo otevřít.')}).getFormDraft(state.formId);
     });
