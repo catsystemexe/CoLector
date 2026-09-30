@@ -33,7 +33,7 @@
 .total-progress .selected{color:#23975b}
 .total-participants{font-weight:780;color:#657086}
 .form-edit-watermark{flex:0 0 auto;width:26px;height:26px;color:#aeb8c8;opacity:.22;pointer-events:none;transform:rotate(-7deg)}
-.form-edit-watermark svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.55}.cloud-status{flex:0 0 auto;width:20px;height:20px;display:inline-grid;place-items:center;color:#aeb6c4}.cloud-status svg{width:18px;height:18px}.cloud-status.local svg{fill:none;stroke:currentColor;stroke-width:1.7}.cloud-status.synced{color:#2671d9}.cloud-status.synced svg{fill:currentColor;stroke:none}
+.form-edit-watermark svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.55}.cloud-status{flex:0 0 auto;width:14px;height:14px;display:inline-grid;place-items:center;color:#b6bdc8}.cloud-status svg{width:13px;height:13px}.cloud-status.local svg{fill:none;stroke:currentColor;stroke-width:1.7}.cloud-status.synced{color:#6f91bd}.cloud-status.synced svg{fill:currentColor;stroke:none}.form-meta .total-progress,.form-meta .total-participants,.form-meta .unpublished{margin-left:8px}
 
 /* multi-Part status zones; locking UI is temporarily disabled */
 .part-controls{position:absolute;z-index:4;right:0;top:0;bottom:0;display:flex;align-items:stretch;cursor:default}
@@ -358,7 +358,6 @@
         const main=document.createElement('div');main.className='form-main';
         main.innerHTML='<div class="form-title-row"><div class="form-title"></div></div><div class="form-meta"><span>'+fmt(form.updatedAt||form.createdAt)+'</span></div>';
         main.querySelector('.form-title').textContent=form.internalTitle||form.title||'Bez názvu';
-        main.querySelector('.form-title-row').append(cloudStatusElement(form.cloudSynced!==false));
 
         if(!isDistributed){
           const watermark=document.createElement('span');watermark.className='form-edit-watermark';watermark.innerHTML=pencilSvg;
@@ -366,6 +365,7 @@
         }
 
         const meta=main.querySelector('.form-meta');
+        meta.append(cloudStatusElement(form.cloudSynced!==false));
         if(!form.publishedAt){
           const unpublished=document.createElement('span');unpublished.className='unpublished';unpublished.textContent='Nepublikováno';meta.append(unpublished);
         }else if(!isMulti){
