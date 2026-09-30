@@ -10,6 +10,7 @@ const FORM_RUNTIME_SHEET = 'FORM_RUNTIME';
 const FORM_RUNTIME_HEADERS = ['form_id', 'total_participants', 'collected_count', 'round_stats_json', 'revision', 'updated_at'];
 const SESSION_REVISION_PREFIX = 'colector.session.revision.';
 const PART_LOCKING_ENABLED = false;
+const FORM_DATA_EXPORT_FOLDER_ID = '1cYHqQ3beLwkh8H17iJJw08kevI8mj9aR';
 
 function registerParticipantOpen(payload) {
   if (!payload || !payload.formId || !payload.teamId) throw new Error('Neplatné otevření formuláře.');
@@ -681,6 +682,8 @@ function getOrCreateFormDataSpreadsheet_(formId, schema, centralStore) {
   const registry = ensureFormDataRegistryStore_(central);
   const title = String(schema.internalTitle || schema.title || 'Formulář').trim() || 'Formulář';
   const spreadsheet = SpreadsheetApp.create('CoLector — ' + title);
+  const exportFolder = DriveApp.getFolderById(FORM_DATA_EXPORT_FOLDER_ID);
+  DriveApp.getFileById(spreadsheet.getId()).moveTo(exportFolder);
   const first = spreadsheet.getSheets()[0];
   first.setName('ODPOVĚDI');
   first.clear();
