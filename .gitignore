@@ -32,3 +32,9 @@ apps-script/.clasp.json
 # Local OAuth/client credentials
 credentials.json
 .clasp-cli/
+
+# Workers pilot build, runtime state and credentials
+workers/dist/
+workers/.wrangler/
+workers/.dev.vars*
+workers/wrangler.local.jsonc
