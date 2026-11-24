@@ -1,0 +1,22 @@
+{
+  "name": "colector-workers",
+  "version": "1.0.0",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "npm run build && node --test",
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "qrcodejs": "1.0.0"
+  },
+  "devDependencies": {
+    "miniflare": "4.20260730.0",
+    "wrangler": "4.168.0"
+  }
+}
